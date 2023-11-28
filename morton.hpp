@@ -2,16 +2,18 @@
 #define MORTON_HPP 
 
 #include <bitset>
+#include <array>
 #include <limits>
+#include <cstring>
 
 using std::bitset;
+using std::array;
 
 template<size_t Dim, size_t N>
 class Morton: public bitset<Dim*N> {
 public:
-    using bitset<Dim*N>::bitset;
-
-    Morton(const bitset<Dim*N>& bs) : bitset<Dim*N>(bs) {}
+    template<typename T>
+    constexpr Morton(T val) : std::bitset<Dim*N>(val) {}
 
     Morton operator<<(size_t pos) const
     {
@@ -21,6 +23,12 @@ public:
     Morton<Dim, N>& operator<<=(size_t pos)
     {
         this->bitset<Dim*N>::operator<<= (Dim*pos);
+        return *this;
+    }
+
+    template<typename T>
+    Morton<Dim, N>& operator=(T val) {
+        this->bitset<Dim*N>::operator= (val);
         return *this;
     }
 
@@ -77,17 +85,17 @@ public:
         return *this;
     }
 
-    bool operator<(const Morton& other);
+    bool operator<(const Morton& other) const;
 
-    bool operator>(const Morton& other){
+    bool operator>(const Morton& other) const{
         return other.operator>(*this);
     }
 
-    bool operator>=(const Morton& other){
+    bool operator>=(const Morton& other) const{
         return !(this->operator<(*this));
     }
 
-    bool operator<=(const Morton& other){
+    bool operator<=(const Morton& other) const{
         return !(this->operator>(*this));
     }
 
@@ -116,6 +124,9 @@ public:
         return *this;
     }
 
+    static constexpr size_t szInBytes = (Dim*N+7)/8;
+    static constexpr size_t szBitsetInBytes = (N+7)/8;
+
     private:
     static constexpr Morton<Dim, N> createOnes() {
         size_t i(1);
@@ -126,9 +137,126 @@ public:
     public:
     static constexpr Morton<Dim,N> ones = createOnes();
 };
+ 
+template<size_t Dim, size_t N>
+class MortonEncoder {
+public:
+    MortonEncoder() {computeMagicBitsEnc();}
+    template<size_t dir, typename T> 
+    Morton<Dim, N> encode(T coord) const;
+    template<typename T>
+    Morton<Dim, N> encode(array<T,Dim> coord) const{
+        Morton<Dim, N> m(encode<0>(coord[0]));
+        for(auto i(1); i<Dim;++i)
+            m |= encode<i>(coord[0]);
+        return m;
+    }
+    template<size_t dir> 
+    bitset<N> decode(Morton<Dim, N> m) const;
+    array<bitset<N>,Dim> decode(Morton<Dim, N> m) const
+    {
+        array<bitset<N>,Dim> coord;
+        for(auto i(0); i<Dim;++i)
+            coord[i] = decode<i>(m);
+        return coord;
+    }
+private:
+    void computeMagicBitsEnc();
+    static constexpr size_t maxMove_ = (Dim-1)*N;
+    static constexpr size_t determineNumShift()
+    {
+            auto m = maxMove_;
+            size_t i(0);
+            for(; m !=0; ++i)
+                m = (m >>1);
+            return i;
+    }
+    static constexpr size_t numShifts_ = determineNumShift();
+    static constexpr size_t numMagicBits_ = numShifts_ + 1;
+    static constexpr array<size_t, numMagicBits_> createShifts() 
+    {
+        array<size_t, numMagicBits_> shfts;
+        shfts[0] = (1<<numShifts_);
+        for(auto i(1);i < numMagicBits_; ++i)
+            shfts[i] = (shfts[i-1] >> 1);
+        return shfts;
+    }
+    static constexpr array<size_t, numMagicBits_> shifts_ = createShifts();
+    array<bitset<Dim*N>, numMagicBits_> magicBits_;
+};
+ 
+template<size_t Dim, size_t N>
+void MortonEncoder<Dim, N>::computeMagicBitsEnc()
+{
+    for (auto i(0); i < N; ++i)
+    {
+        magicBits_[0].set(i);
+    }
+    array<bitset<numShifts_>, N> shiftBits;
+    for (auto i(0); i < N; ++i)
+    {
+        shiftBits[i] = bitset<numShifts_>(i * (Dim - 1));
+    }
+    for (auto i(0); i < numShifts_; ++i)
+    {
+        for (auto j(0); j < N; ++j)
+        {
+            magicBits_[numShifts_ - i][j] = shiftBits[j][i];
+        }
+        magicBits_[numShifts_ - i] &= magicBits_[0];
+    }
+    auto maskLoc = magicBits_[0];
+    unsigned int shft = (1 << (numShifts_ - 1));
+    for (auto i(1); i < numMagicBits_; ++i)
+    {
+        for (auto j(i + 1); j < numMagicBits_; ++j)
+            magicBits_[j] = (magicBits_[j] & ~magicBits_[i]) | ((magicBits_[j] & magicBits_[i]) << shft);
+        maskLoc = (maskLoc & ~magicBits_[i]) | ((maskLoc & magicBits_[i]) << shft);
+        magicBits_[i] = ((~magicBits_[i] & maskLoc) | (magicBits_[i] << shft & maskLoc));
+        shft = (shft >> 1);
+    }
+};
 
 template<size_t Dim, size_t N>
-bool Morton<Dim, N>::operator<(const Morton& other)
+template<size_t dir, typename T> 
+Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord) const
+{
+    static_assert(dir<Dim, "direction should be in between 0 and Dim.");
+    Morton<Dim, N> m(coord);
+    m &= magicBits_[0];
+    for(auto i(1); i < numMagicBits_; ++i){
+        Morton<Dim, N> m2(m.bitset<Dim*N>::operator<<(shifts_[i]));
+        m.bitset<Dim*N>::operator|=(m2);
+        m.bitset<Dim*N>::operator&=(magicBits_[i]);
+    }
+    if constexpr(dir != 0) {
+        m.bitset<Dim*N>::operator<<=(dir);
+    }
+    return m;
+         //     bs = (bs | (bs << shifts_[i])) & magicBits_[i];
+};
+
+template<size_t Dim, size_t N>
+template<size_t dir>
+bitset<N> MortonEncoder<Dim, N>::decode(Morton<Dim, N> m) const
+{
+    static_assert(dir<Dim, "direction should be in between 0 and Dim.");
+    if constexpr(dir != 0) {
+        m.bitset<Dim*N>::operator>>=(dir);
+    }
+    m &= magicBits_[numMagicBits_-1];
+    for(auto i(numMagicBits_-2); i != -1; --i){
+        Morton<Dim, N> m2(m.bitset<Dim*N>::operator>>(shifts_[i+1]));
+        m.bitset<Dim*N>::operator|=(m2);
+        m.bitset<Dim*N>::operator&=(magicBits_[i]);
+    }
+    bitset<N> b;
+    std::memcpy(&b, &m, Morton<Dim, N>::szBitsetInBytes);
+    return b;
+}
+
+template<size_t Dim, size_t N>
+bool Morton<Dim, N>::operator<(const Morton& other) const
 {
     constexpr size_t numBits = (Dim*N);
     if constexpr (numBits <= sizeof(unsigned long) * 8)
@@ -170,10 +298,9 @@ namespace std {
     template <size_t Dim, size_t N>
     struct hash<Morton<Dim, N>> {
         size_t operator()(const Morton<Dim, N>& m) const {
-            return std::hash<std::bitset<Dim * N>>{}(static_cast<const std::bitset<Dim * N>&>(m));
+            return std::hash<std::bitset<Dim * N>>{}(reinterpret_cast<const std::bitset<Dim * N>&>(m));
         }
     };
 }
 
-#endif //MORTON_HPP 
-
+#endif //MORTON_HPP
