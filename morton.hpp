@@ -16,31 +16,25 @@ public:
     // Bring constructors from BitArrayBase into BitArray
     using BitArrayBase<Morton<Dim,N>, Dim*N>::BitArrayBase;
 
-    Morton operator<<(size_t pos) const
-    {
-        return Morton(this->BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<(Dim * pos));
-    }
+    // Constructor to convert from BitArrayBase to Morton
+    Morton(const BitArrayBase<Morton<Dim, N>, Dim*N>& other)
+        : BitArrayBase<Morton<Dim, N>, Dim*N>(other) {}
 
     Morton<Dim, N>& operator<<=(size_t pos)
     {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<= (Dim*pos);
+        BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<= (Dim*pos);
         return *this;
     }
 
     template<typename T>
     Morton<Dim, N>& operator=(T val) {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::operator= (val);
+        BitArrayBase<Morton<Dim,N>, Dim*N>::operator= (val);
         return *this;
-    }
-
-    Morton operator>>(size_t pos) const
-    {
-        return Morton(this->BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>(Dim * pos));
     }
 
     Morton<Dim, N>& operator>>=(size_t pos)
     {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>= (Dim*pos);
+        BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>= (Dim*pos);
         return *this;
     }
 
@@ -52,7 +46,7 @@ public:
         // Propagate carry
         while (carry.any())
         {
-            Morton<Dim, N> shiftedCarry = carry << 1;
+            Morton<Dim, N> shiftedCarry = (carry << 1);
             carry = result & shiftedCarry;
             result ^= shiftedCarry;
         }
@@ -65,7 +59,7 @@ public:
         // Propagate carry
         while (carry.any())
         {
-            Morton<Dim, N> shiftedCarry = carry << 1;
+            Morton<Dim, N> shiftedCarry = (carry << 1);
             carry = (*this) & shiftedCarry;
             (*this) ^= shiftedCarry;
         }
@@ -85,42 +79,51 @@ public:
         return operator+=(complement);
     }
 
-    bool test( size_t dir, size_t pos, bool value=true) const
+    bool test( size_t dir, size_t pos) const
     {
-        return this->BitArrayBase<Morton<Dim,N>, Dim*N>::test(Dim*pos + dir, value);
+        return BitArrayBase<Morton<Dim,N>, Dim*N>::test(Dim*pos + dir);
     }
 
-    Morton& set( size_t dir, size_t pos)
+    Morton& set( size_t dir, size_t pos, bool value = true)
     {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::set(Dim*pos + dir);
+        BitArrayBase<Morton<Dim,N>, Dim*N>::set(Dim*pos + dir, value);
         return *this;
     }   
 
     Morton& reset( size_t dir, size_t pos)
     {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::reset(Dim*pos + dir);
+        BitArrayBase<Morton<Dim,N>, Dim*N>::reset(Dim*pos + dir);
         return *this;
     }   
-
-    Morton& flip( size_t dir, size_t pos)
-    {
-        this->BitArrayBase<Morton<Dim,N>, Dim*N>::flip(Dim*pos + dir);
-        return *this;
-    }
-
-/*
-    size_t countr_zeros() const
-    {
-        unsigned long *i;
-        
-
-    }
-*/
 
     static constexpr size_t szInBytes = (Dim*N+7)/8;
     static constexpr size_t szBitsetInBytes = (N+7)/8;
 
 };
+
+template <size_t Dim, size_t N>
+Morton<Dim, N> operator<<(const Morton<Dim, N>& m, size_t shift) {
+    Morton<Dim, N> result = m; // Create a copy of the input Morton object
+    result <<= shift;          // Apply the left shift
+    return result;             // Return the modified copy
+}
+
+template <size_t Dim, size_t N>
+Morton<Dim, N> operator>>(const Morton<Dim, N>& m, size_t shift) {
+    Morton<Dim, N> result = m; // Create a copy of the input Morton object
+    result >>= shift;          // Apply the left shift
+    return result;             // Return the modified copy
+}
+
+
+/*
+template <size_t Dim, size_t N>
+Morton<Dim,N> operator<<(const Morton<Dim,N> &m, size_t shift)
+{
+    Morton<Dim,N> result(m);
+    return (result.operator<<=(shift));
+}
+*/
 
 template<size_t Dim, size_t N>
 class MortonEncoder {
