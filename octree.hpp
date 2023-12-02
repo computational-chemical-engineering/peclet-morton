@@ -4,6 +4,7 @@
 #include "morton.hpp"
 #include <map>
 #include <array>
+#include <vector>
 #include <iostream>
 
 using std::array;
@@ -19,6 +20,8 @@ public:
     using mapped_type = typename tree_type::mapped_type;
     using value_type = typename tree_type::value_type;
     using iterator = typename tree_type::iterator;
+    using const_iterator = typename tree_type::const_iterator;
+
     Octree() { initializeMasks(); }
     const array<Morton<Dim, N>, N> &getMasksRightTrue() const { return masks_right_true_; }
     const array<Morton<Dim, N>, N> &getMasksRightFalse() const { return masks_right_false_; }
@@ -27,13 +30,44 @@ public:
     const array<Morton<Dim, N>, Dim> &getMasksDim() const { return masks_dim_; }
     const array<array<Morton<Dim, N>, numOctants>,N> &getOctants() const { return octants_;}
     bool insert(const value_type &value, size_t level);
-    size_t getLevel(iterator itr) const{
-        (*itr);
-        return 0;
+    size_t getLevel(const Morton<Dim, N> &m) const{
+        //logic for a complete tree a cell is always part of an octant
+        size_t level = m.countr_zero();
+        if (level==0)
+            return level;
+        size_t subLevel = level-1;
+        Morton<Dim, N> mSub = 1;
+        mSub <<= subLevel;
+        while (subLevel != -1)
+        {
+            if (tree_.count(m+mSub) ==0){
+                return level;
+            }
+            level = subLevel;
+            subLevel -= 1;
+            mSub >>= 1;
+        }
+        return level;
     }
+
     void print(){
         for(auto itr = tree_.cbegin(); itr != tree_.cend();++itr)
             std::cout << itr->first << " " << itr->second << std::endl;
+    }
+
+    auto getCells() const{
+        std::vector<std::array< std::array<int,Dim> ,2>> cells;
+        cells.reserve(tree_.size());
+        std::array<std::array<int,Dim>,2> cell;
+        for(auto itr = tree_.cbegin(); itr != tree_.cend();++itr){
+            auto level = getLevel(itr->first);
+            cell[0][0] = encoder_.template decode<0>(itr->first).template getIntValue<int>();
+            cell[0][1] = encoder_.template decode<1>(itr->first).template getIntValue<int>();
+            cell[1][0] = cell[0][0] + (1<<level);
+            cell[1][1] = cell[0][1] + (1<<level);
+            cells.push_back(cell);
+        }
+    return cells;
     }
 private:
     array<Morton<Dim, N>, N> masks_right_true_;
@@ -42,7 +76,7 @@ private:
     array<Morton<Dim, N>, N> masks_unselect_level_;
     array<Morton<Dim, N>, Dim> masks_dim_;
     array<array<Morton<Dim, N>, numOctants>, N> octants_;
-
+    MortonEncoder<Dim, N> encoder_;
     void initializeMasks();
     tree_type tree_;
 };
@@ -66,12 +100,11 @@ void Octree<Dim, N, T>::initializeMasks()
         masks_unselect_level_[i] = ~morton;
         morton <<= 1;
     }
-    morton = 0;
-    morton -= 1;
+    morton = 0; morton -= 1;
     for (auto i(0); i < Dim; ++i)
     {
         masks_dim_[i] = morton;
-        morton.BitArray<Dim*N>::operator<<=(1); 
+        morton.BitArrayBase<Morton<Dim, N>, Dim * N>::operator<<=(1); 
     }
     array<Morton<Dim, N>, numOctants> octants;
     for (auto i(0); i < numOctants; ++i)

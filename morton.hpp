@@ -1,5 +1,5 @@
 #ifndef MORTON_HPP
-#define MORTON_HPP 
+#define MORTON_HPP
 
 #include <array>
 #include <limits>
@@ -7,114 +7,124 @@
 #include <utility>
 #include "bitarray.hpp"
 
-//using BitArray;
 using std::array;
 
-template<size_t Dim, size_t N>
-class Morton : public BitArrayBase<Morton<Dim,N>, Dim*N> {
+template <size_t Dim, size_t N>
+class Morton : public BitArrayBase<Morton<Dim, N>, Dim * N>
+{
 public:
     // Bring constructors from BitArrayBase into BitArray
-    using BitArrayBase<Morton<Dim,N>, Dim*N>::BitArrayBase;
+    using BitArrayBase<Morton<Dim, N>, Dim * N>::BitArrayBase;
 
     // Constructor to convert from BitArrayBase to Morton
-    Morton(const BitArrayBase<Morton<Dim, N>, Dim*N>& other)
-        : BitArrayBase<Morton<Dim, N>, Dim*N>(other) {}
+    Morton(const BitArrayBase<Morton<Dim, N>, Dim * N> &other)
+        : BitArrayBase<Morton<Dim, N>, Dim * N>(other) {}
 
-    Morton<Dim, N>& operator<<=(size_t pos)
+    Morton<Dim, N> &operator<<=(size_t pos)
     {
-        BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<= (Dim*pos);
+        BitArrayBase<Morton<Dim, N>, Dim * N>::operator<<=(Dim * pos);
         return *this;
     }
 
-    template<typename T>
-    Morton<Dim, N>& operator=(T val) {
-        BitArrayBase<Morton<Dim,N>, Dim*N>::operator= (val);
+    Morton<Dim, N> &operator>>=(size_t pos)
+    {
+        BitArrayBase<Morton<Dim, N>, Dim * N>::operator>>=(Dim * pos);
         return *this;
     }
 
-    Morton<Dim, N>& operator>>=(size_t pos)
+    Morton<Dim, N> operator+=(const Morton<Dim, N> &other)
     {
-        BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>= (Dim*pos);
-        return *this;
-    }
+        Morton<Dim, N> carry = *this & other; // Initial carry
+        *this ^= other;                       // Initial sum (without carry)
 
-    // Addition operators
-    Morton operator+(const Morton &other) const
-    {
-        Morton<Dim, N> carry = (*this) & other;  // Initial carry
-        Morton<Dim, N> result = (*this) ^ other; // Initial sum (without carry)
-        // Propagate carry
+        // Propagate carry without creating additional Morton objects
         while (carry.any())
         {
-            Morton<Dim, N> shiftedCarry = (carry << 1);
-            carry = result & shiftedCarry;
-            result ^= shiftedCarry;
+            Morton<Dim, N> shiftedCarry = carry;
+            shiftedCarry <<= 1;
+            Morton<Dim, N> newCarry = *this & shiftedCarry;
+            *this ^= shiftedCarry;
+            carry = newCarry;
         }
-        return result;
-    }
 
-    Morton& operator+=(const Morton& other) {
-        Morton<Dim, N> carry = (*this) & other;  // Initial carry
-        (*this) ^= other; // Initial sum (without carry)
-        // Propagate carry
-        while (carry.any())
-        {
-            Morton<Dim, N> shiftedCarry = (carry << 1);
-            carry = (*this) & shiftedCarry;
-            (*this) ^= shiftedCarry;
-        }
         return *this;
     }
 
-    // Subtraction operators
-    Morton operator-(const Morton& other) const {
-        auto ones = static_cast<Morton<Dim,N> >((static_cast<size_t>(1) << Dim)-1);
-        auto complement = (~other + ones);
-        return operator+(complement);
-    }
-
-    Morton& operator-=(const Morton& other) {
-        Morton<Dim,N> ones = static_cast<Morton<Dim,N> >((static_cast<size_t>(1) << Dim)-1);
-        Morton<Dim,N> complement = (~other + ones);
-        return operator+=(complement);
-    }
-
-    bool test( size_t dir, size_t pos) const
+    Morton &operator-=(const Morton &other)
     {
-        return BitArrayBase<Morton<Dim,N>, Dim*N>::test(Dim*pos + dir);
-    }
-
-    Morton& set( size_t dir, size_t pos, bool value = true)
-    {
-        BitArrayBase<Morton<Dim,N>, Dim*N>::set(Dim*pos + dir, value);
+        Morton<Dim, N> ones = static_cast<Morton<Dim, N>>((static_cast<size_t>(1) << Dim) - 1);
+        Morton<Dim, N> complement = (~other + ones);
+        operator+=(complement);
         return *this;
-    }   
+    }
 
-    Morton& reset( size_t dir, size_t pos)
+    bool test(size_t dir, size_t pos) const
     {
-        BitArrayBase<Morton<Dim,N>, Dim*N>::reset(Dim*pos + dir);
+        return BitArrayBase<Morton<Dim, N>, Dim * N>::test(Dim * pos + dir);
+    }
+
+    Morton &set(size_t dir, size_t pos, bool value = true)
+    {
+        BitArrayBase<Morton<Dim, N>, Dim * N>::set(Dim * pos + dir, value);
         return *this;
-    }   
+    }
 
-    static constexpr size_t szInBytes = (Dim*N+7)/8;
-    static constexpr size_t szBitsetInBytes = (N+7)/8;
+    Morton &reset(size_t dir, size_t pos)
+    {
+        BitArrayBase<Morton<Dim, N>, Dim * N>::reset(Dim * pos + dir);
+        return *this;
+    }
 
+    size_t countr_zero() const
+    {
+        return (BitArrayBase<Morton<Dim, N>, Dim * N>::countr_zero()/Dim);
+    }
+
+    static constexpr size_t szInBytes = (Dim * N + 7) / 8;
+    static constexpr size_t szBitsetInBytes = (N + 7) / 8;
 };
 
 template <size_t Dim, size_t N>
-Morton<Dim, N> operator<<(const Morton<Dim, N>& m, size_t shift) {
+Morton<Dim, N> operator<<(const Morton<Dim, N> &m, size_t shift)
+{
     Morton<Dim, N> result = m; // Create a copy of the input Morton object
     result <<= shift;          // Apply the left shift
     return result;             // Return the modified copy
 }
 
 template <size_t Dim, size_t N>
-Morton<Dim, N> operator>>(const Morton<Dim, N>& m, size_t shift) {
+Morton<Dim, N> operator>>(const Morton<Dim, N> &m, size_t shift)
+{
     Morton<Dim, N> result = m; // Create a copy of the input Morton object
     result >>= shift;          // Apply the left shift
     return result;             // Return the modified copy
 }
 
+template <size_t Dim, size_t N>
+Morton<Dim, N> operator+(const Morton<Dim, N> &lhs, const Morton<Dim, N> &rhs)
+{
+    Morton<Dim, N> carry = lhs & rhs;  // Initial carry
+    Morton<Dim, N> result = lhs ^ rhs; // Initial sum (without carry)
+    // Propagate carry without creating additional Morton objects
+    while (carry.any())
+    {
+        Morton<Dim, N> shiftedCarry = carry;
+        shiftedCarry <<= 1;
+        Morton<Dim, N> newCarry = result & shiftedCarry;
+        result ^= shiftedCarry;
+        carry = newCarry;
+    }
+    return result;
+}
+
+// Subtraction operators
+template <size_t Dim, size_t N>
+Morton<Dim,N> operator-(const Morton<Dim, N> &lhs, const Morton<Dim, N> &rhs)
+{
+    auto ones = static_cast<Morton<Dim, N>>((static_cast<size_t>(1) << Dim) - 1);
+    auto complement = (~rhs + ones);
+    return (lhs + complement);
+}
 
 /*
 template <size_t Dim, size_t N>
@@ -125,56 +135,62 @@ Morton<Dim,N> operator<<(const Morton<Dim,N> &m, size_t shift)
 }
 */
 
-template<size_t Dim, size_t N>
-class MortonEncoder {
+template <size_t Dim, size_t N>
+class MortonEncoder
+{
 public:
-    MortonEncoder() {computeMagicBitsEnc();}
-    template<size_t dir, typename T>
+    MortonEncoder() { computeMagicBitsEnc(); }
+    template <size_t dir, typename T>
     Morton<Dim, N> encode(T coord) const;
-    template<typename T>
-    Morton<Dim, N> encode(const std::array<T, Dim>& coord) const {
+    template <typename T>
+    Morton<Dim, N> encode(const std::array<T, Dim> &coord) const
+    {
         return encodeImpl(coord, std::make_index_sequence<Dim>{});
     }
-    template<size_t dir> 
+    template <size_t dir>
     BitArray<N> decode(Morton<Dim, N> m) const;
-    std::array<BitArray<N>, Dim> decode(const Morton<Dim, N>& m) {
+    std::array<BitArray<N>, Dim> decode(const Morton<Dim, N> &m) const
+    {
         return decodeImpl(m, std::make_index_sequence<Dim>{});
     }
+
 private:
     void computeMagicBitsEnc();
     template <typename T, size_t... Is>
-    auto encodeImpl(const std::array<T, Dim>& coord, std::index_sequence<Is...>) const {
+    auto encodeImpl(const std::array<T, Dim> &coord, std::index_sequence<Is...>) const
+    {
         Morton<Dim, N> m = (encode<Is>(coord[Is]) | ...);
         return m;
     }
     template <size_t... Is>
-    auto decodeImpl(const Morton<Dim, N>& m, std::index_sequence<Is...>) const {
-        return std::array<BitArray<N>, Dim>{{ decode<Is>(m)... }};
+    auto decodeImpl(const Morton<Dim, N> &m, std::index_sequence<Is...>) const
+    {
+        return std::array<BitArray<N>, Dim>{{decode<Is>(m)...}};
     }
-    static constexpr size_t maxMove_ = (Dim-1)*N;
+    static constexpr size_t maxMove_ = (Dim - 1) * N;
     static constexpr size_t determineNumShift()
     {
-            auto m = maxMove_;
-            size_t i(0);
-            for(; m !=0; ++i)
-                m = (m >>1);
-            return i;
+        auto m = maxMove_;
+        size_t i(0);
+        for (; m != 0; ++i)
+            m = (m >> 1);
+        return i;
     }
     static constexpr size_t numShifts_ = determineNumShift();
     static constexpr size_t numMagicBits_ = numShifts_ + 1;
-    static constexpr array<size_t, numMagicBits_> createShifts() 
+    static constexpr array<size_t, numMagicBits_> createShifts()
     {
         array<size_t, numMagicBits_> shfts;
-        shfts[0] = (1<<numShifts_);
-        for(auto i(1);i < numMagicBits_; ++i)
-            shfts[i] = (shfts[i-1] >> 1);
+        shfts[0] = (1 << numShifts_);
+        for (auto i(1); i < numMagicBits_; ++i)
+            shfts[i] = (shfts[i - 1] >> 1);
         return shfts;
     }
     static constexpr array<size_t, numMagicBits_> shifts_ = createShifts();
-    array<Morton<Dim,N>, numMagicBits_> magicBits_;
+    array<BitArray<Dim*N>, numMagicBits_> magicBits_;
 };
- 
-template<size_t Dim, size_t N>
+
+template <size_t Dim, size_t N>
 void MortonEncoder<Dim, N>::computeMagicBitsEnc()
 {
     for (auto i(0); i < N; ++i)
@@ -206,44 +222,41 @@ void MortonEncoder<Dim, N>::computeMagicBitsEnc()
     }
 };
 
-template<size_t Dim, size_t N>
-template<size_t dir, typename T> 
+template <size_t Dim, size_t N>
+template <size_t dir, typename T>
 Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord) const
 {
-    static_assert(dir<Dim, "direction should be in between 0 and Dim.");
-    Morton<Dim, N> m(coord);
-    m &= magicBits_[0];
-    for(auto i(1); i < numMagicBits_; ++i){
-        Morton<Dim, N> m2(m);
-        m2.BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<=(shifts_[i]);
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator|=(m2);
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator&=(magicBits_[i]);
+    static_assert(dir < Dim, "direction should be in between 0 and Dim.");
+    Morton<Dim,N> m(coord);
+    BitArray<Dim*N>& b = reinterpret_cast<BitArray<Dim*N>&>(m);
+    b &= magicBits_[0];
+    for (auto i(1); i < numMagicBits_; ++i)
+    {
+        b = (b | (b << shifts_[i])) & magicBits_[i];
     }
-    if constexpr(dir != 0) {
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator<<=(dir);
+    if constexpr (dir != 0)
+    {
+        b <<= (dir);
     }
     return m;
-         //     bs = (bs | (bs << shifts_[i])) & magicBits_[i];
 };
 
-template<size_t Dim, size_t N>
-template<size_t dir>
+template <size_t Dim, size_t N>
+template <size_t dir>
 BitArray<N> MortonEncoder<Dim, N>::decode(Morton<Dim, N> m) const
 {
-    static_assert(dir<Dim, "direction should be in between 0 and Dim.");
-    if constexpr(dir != 0) {
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>=(dir);
+    static_assert(dir < Dim, "direction should be in between 0 and Dim.");
+    BitArray<Dim*N>& b = reinterpret_cast<BitArray<Dim*N>&>(m);
+    if constexpr (dir != 0)
+    {
+        b >>= dir;
     }
-    m &= magicBits_[numMagicBits_-1];
-    for(auto i(numMagicBits_-2); i != -1; --i){
-        Morton<Dim, N> m2(m);
-        m2.BitArrayBase<Morton<Dim,N>, Dim*N>::operator>>(shifts_[i+1]);
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator|=(m2);
-        m.BitArrayBase<Morton<Dim,N>, Dim*N>::operator&=(magicBits_[i]);
+    b &= magicBits_[numMagicBits_ - 1];
+    for (auto i(numMagicBits_ - 2); i != -1; --i)
+    {
+        b = ((b>> shifts_[i + 1]) | b) & (magicBits_[i]);
     }
-    BitArray<N> b(m);
-    //std::memcpy(&b, &m, Morton<Dim, N>::szBitsetInBytes);
-    return b;
+    return m;
 }
 
-#endif //MORTON_HPP
+#endif // MORTON_HPP

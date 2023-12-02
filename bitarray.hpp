@@ -87,6 +87,15 @@ bool test(size_t index) const;
 bool operator[](size_t index) const;
 
 /**
+ * @brief Return the bitarray as an integer value
+ *
+ * @tparam T The integer type.
+ * @return value The integer value to initialize the bit array with.
+ */
+template <typename T>
+T getIntValue() const;
+
+/**
  * @brief Sets a specific bit to 1.
  * 
  * @param index The index of the bit to set.
@@ -226,6 +235,13 @@ bool any();
  * @return True if no bits are set, false otherwise.
  */
 bool none();
+
+/**
+ * @brief Returns the number of consecutive 0 bits starting from the least significant bit ("right").
+ * 
+ * @return Number of consecutive 0 bits 
+ */
+size_t countr_zero() const;
 
 /**
  * @brief Provides a reference to a specific bit.
@@ -480,6 +496,16 @@ template <typename Derived, size_t N>
 bool BitArrayBase<Derived, N>::operator[](size_t index) const
 {
     return test(index);
+}
+
+template <typename Derived, size_t N>
+template <typename T>
+T BitArrayBase<Derived, N>::getIntValue() const
+{
+    T value;
+    constexpr size_t minSizeBytes = std::min(sizeof(bits_), sizeof(value));
+    std::memcpy(&value, bits_, minSizeBytes);
+    return value;
 }
 
 // Set Bit Method Implementation
@@ -825,6 +851,43 @@ bool BitArrayBase<Derived, N>::none()
     return !any();
 }
 
+// Counting consecutive zeros form the right implementation
+template <typename Derived, size_t N>
+size_t BitArrayBase<Derived, N>::countr_zero() const
+{
+    size_t cnt = std::countr_zero(bits_[0]);
+    if constexpr (numInt == 1)
+    {       
+        if constexpr (N < szInt)
+        {
+            cnt = (cnt>N ? N : cnt);
+        }
+    }
+    else
+    {
+        if (cnt != szInt){
+             return cnt;
+        } 
+        else
+        {
+            int cntInt;
+            for (size_t i = 1; i < numInt; ++i)
+            {
+                cntInt = std::countr_zero(bits_[i]);
+                cnt += cntInt;
+                if (cntInt != szInt){
+                    return cnt;
+                } 
+            }
+            if constexpr (N % szInt != 0)
+            {
+                cnt = (cnt>N ? N : cnt);
+            }
+        }
+    }
+    return cnt;
+}
+
 // BitReference support implementation
 template <typename Derived, size_t N>
 BitReference<Derived, N> BitArrayBase<Derived, N>::operator[](size_t index)
@@ -882,5 +945,25 @@ Derived operator^(const BitArrayBase<Derived, N> &bitArray1, const BitArrayBase<
     result ^= static_cast<const Derived&>(bitArray2); // Apply bitwise XOR using member operator^=
     return result; // Return the result
 }
+
+//Bitreference contructor
+template <typename Derived, size_t N>
+BitReference<Derived, N>::BitReference(BitArrayBase<Derived, N> &ba, size_t idx): bitArray(ba), index(idx) {}
+
+// Assignment operator to set the bit
+template <typename Derived, size_t N>
+BitReference<Derived, N> &BitReference<Derived, N>::operator=(bool value)
+{
+    bitArray.set(index, value);
+    return *this;
+}
+
+// Conversion to bool (read the bit)
+template <typename Derived, size_t N>
+BitReference<Derived, N>::operator bool() const
+{
+    return bitArray.test(index);
+}
+
 
 #endif // BITARRAY_HPP
