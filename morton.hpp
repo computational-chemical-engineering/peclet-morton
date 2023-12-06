@@ -4,7 +4,7 @@
 #include <array>
 #include <limits>
 #include <cstring>
-#include <utility>
+#include <utility>  
 #include "bitarray.hpp"
 
 using std::array;
@@ -42,9 +42,10 @@ public:
         {
             Morton<Dim, N> shiftedCarry = carry;
             shiftedCarry <<= 1;
-            Morton<Dim, N> newCarry = *this & shiftedCarry;
+//            Morton<Dim, N> newCarry = *this & shiftedCarry;
+            carry = *this & shiftedCarry;
             *this ^= shiftedCarry;
-            carry = newCarry;
+//            carry = newCarry;
         }
 
         return *this;
@@ -140,15 +141,14 @@ class MortonEncoder
 {
 public:
     MortonEncoder() { computeMagicBitsEnc(); }
-    template <size_t dir, typename T>
-    Morton<Dim, N> encode(T coord) const;
+    template <typename T>
+    Morton<Dim, N> encode(T coord, size_t dir) const;
     template <typename T>
     Morton<Dim, N> encode(const std::array<T, Dim> &coord) const
     {
         return encodeImpl(coord, std::make_index_sequence<Dim>{});
     }
-    template <size_t dir>
-    BitArray<N> decode(Morton<Dim, N> m) const;
+    BitArray<N> decode(Morton<Dim, N> m, size_t dir) const;
     std::array<BitArray<N>, Dim> decode(const Morton<Dim, N> &m) const
     {
         return decodeImpl(m, std::make_index_sequence<Dim>{});
@@ -159,13 +159,13 @@ private:
     template <typename T, size_t... Is>
     auto encodeImpl(const std::array<T, Dim> &coord, std::index_sequence<Is...>) const
     {
-        Morton<Dim, N> m = (encode<Is>(coord[Is]) | ...);
+        Morton<Dim, N> m = (encode(coord[Is], Is) | ...);
         return m;
     }
     template <size_t... Is>
     auto decodeImpl(const Morton<Dim, N> &m, std::index_sequence<Is...>) const
     {
-        return std::array<BitArray<N>, Dim>{{decode<Is>(m)...}};
+        return std::array<BitArray<N>, Dim>{{decode(m, Is)...}};
     }
     static constexpr size_t maxMove_ = (Dim - 1) * N;
     static constexpr size_t determineNumShift()
@@ -223,10 +223,9 @@ void MortonEncoder<Dim, N>::computeMagicBitsEnc()
 };
 
 template <size_t Dim, size_t N>
-template <size_t dir, typename T>
-Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord) const
+template <typename T>
+Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord, size_t dir) const
 {
-    static_assert(dir < Dim, "direction should be in between 0 and Dim.");
     Morton<Dim,N> m(coord);
     BitArray<Dim*N>& b = reinterpret_cast<BitArray<Dim*N>&>(m);
     b &= magicBits_[0];
@@ -234,7 +233,7 @@ Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord) const
     {
         b = (b | (b << shifts_[i])) & magicBits_[i];
     }
-    if constexpr (dir != 0)
+    if (dir != 0)
     {
         b <<= (dir);
     }
@@ -242,12 +241,10 @@ Morton<Dim, N> MortonEncoder<Dim, N>::encode(T coord) const
 };
 
 template <size_t Dim, size_t N>
-template <size_t dir>
-BitArray<N> MortonEncoder<Dim, N>::decode(Morton<Dim, N> m) const
+BitArray<N> MortonEncoder<Dim, N>::decode(Morton<Dim, N> m, size_t dir) const
 {
-    static_assert(dir < Dim, "direction should be in between 0 and Dim.");
     BitArray<Dim*N>& b = reinterpret_cast<BitArray<Dim*N>&>(m);
-    if constexpr (dir != 0)
+    if (dir != 0)
     {
         b >>= dir;
     }

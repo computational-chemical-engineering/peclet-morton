@@ -137,6 +137,14 @@ Derived &operator>>=(size_t shift);
 Derived &operator<<=(size_t shift);
 
 /**
+ * @brief Addition operator.
+ * 
+ * @return A reference to the modified object.
+ */
+Derived &operator+=(const Derived &other);
+
+
+/**
  * @brief Bitwise OR assignment operator.
  * 
  * @param other The BitArrayBase object to perform bitwise OR with.
@@ -652,6 +660,25 @@ Derived &BitArrayBase<Derived, N>::operator<<=(size_t shift)
     return *static_cast<Derived *>(this);
 }
 
+// Addition operator
+template <typename Derived, size_t N>
+Derived &BitArrayBase<Derived, N>::operator+=(const Derived &other)
+{
+        auto carry = (*this) & other; // Initial carry
+        *this ^= other;               // Initial sum (without carry)
+
+        // Propagate carry without creating additional Morton objects
+        while (carry.any())
+        {
+            auto shiftedCarry = carry;
+            shiftedCarry.BitArrayBase<Derived, N>::operator<<=(1);
+            carry = *this & shiftedCarry;
+            *this ^= shiftedCarry;
+        }
+    return *static_cast<Derived *>(this);
+}
+
+
 // Bitwise OR Assignment Operator Implementation
 template <typename Derived, size_t N>
 Derived &BitArrayBase<Derived, N>::operator|=(const Derived &other)
@@ -724,7 +751,7 @@ Derived BitArrayBase<Derived, N>::operator~() const
     }
     // If N is not a multiple of the size of IntType in bits_, mask off the excess bits_
     constexpr size_t excessBits = N % szInt;
-    if (excessBits != 0)
+    if constexpr (excessBits != 0)
     {
         result.bits_[numInt - 1] &= (static_cast<IntType>(1) << excessBits) - 1;
     }
