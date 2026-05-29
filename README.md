@@ -97,6 +97,9 @@ the GPU pays off only when codes live on-device across a pipeline. See
 
 ## Build, test, benchmark
 
+Full per-platform setup (incl. Python wheels and the GPU build) is in
+[DEVELOPMENT.md](DEVELOPMENT.md). Quick start:
+
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
