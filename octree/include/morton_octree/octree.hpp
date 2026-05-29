@@ -1,9 +1,12 @@
-// morton/octree.hpp
+// morton_octree/octree.hpp
 //
-// A linear octree/quadtree built on the Morton arithmetic core. Leaves are
+// A linear octree/quadtree built on the morton-arithmetic library. Leaves are
 // stored in a std::map keyed by their Morton origin, so the map is already in
 // Z-order. Point location, neighbour finding and refinement are expressed with
 // the core's O(1) arithmetic and hierarchy helpers rather than decode/encode.
+//
+// This is the seed of a separate project (see octree/PLAN.md); it depends on
+// the standalone morton library (morton::Morton).
 //
 // Conventions
 // -----------
@@ -14,8 +17,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-#ifndef MORTON_OCTREE_HPP
-#define MORTON_OCTREE_HPP
+#ifndef MORTON_OCTREE_OCTREE_HPP
+#define MORTON_OCTREE_OCTREE_HPP
 
 #include <array>
 #include <cstdint>
@@ -24,7 +27,9 @@
 
 #include "morton/morton.hpp"
 
-namespace morton {
+namespace morton_octree {
+
+using morton::Morton;
 
 template <unsigned Dim, unsigned Bits, typename T>
 class Octree {
@@ -135,6 +140,6 @@ private:
     map_type leaves_;
 };
 
-}  // namespace morton
+}  // namespace morton_octree
 
-#endif  // MORTON_OCTREE_HPP
+#endif  // MORTON_OCTREE_OCTREE_HPP

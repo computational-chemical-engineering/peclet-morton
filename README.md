@@ -75,10 +75,15 @@ operations, which libmorton and similar libraries do not provide.
 | `morton/morton.hpp` | `Morton<Dim,Bits>`: encode/decode, axis arithmetic, saturating ops, `face_neighbors`/`all_neighbors`, `ancestor`/`child` hierarchy, Z-order `++/--` |
 | `morton/iterate.hpp` | `for_each_in_box` (row-major), `for_each_in_box_zorder` (Z-order), and the Tropf-Herzog range-search pair `bigmin_in_box` / `litmax_in_box` |
 | `morton/batch.hpp` | vectorised bulk `add`/`sub`/`step`/`encode` over arrays (AVX2 auto-vectorised) |
-| `morton/octree.hpp` | `Octree<Dim,Bits,T>`: linear octree/quadtree with point location, face neighbours and refinement built on the arithmetic core |
+| `morton/wide_uint.hpp` | fixed-width word-array unsigned backing codes wider than 128 bits (pulled in automatically) |
 
 Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`,
-`Morton3D32`, `Morton2D64`.
+`Morton3D32`, `Morton2D64`. Codes wider than 128 bits (up to `MORTON_MAX_BITS`,
+default 256) work too, e.g. `Morton<3,64>` (192-bit), `Morton<2,128>` (256-bit).
+
+A linear **octree/quadtree** built on this library lives in the sibling
+[`octree/`](octree/) project (`morton_octree::Octree`) — it is being split into
+its own repository; see [octree/PLAN.md](octree/PLAN.md).
 
 ## Build, test, benchmark
 
@@ -89,10 +94,19 @@ ctest --test-dir build --output-on-failure   # or: ./build/tests/morton_tests
 ./build/benchmarks/morton_bench
 ```
 
-As a header-only dependency in another CMake project:
+As a header-only dependency in another CMake project — either vendored:
 
 ```cmake
 add_subdirectory(morton_arithmetic)
+target_link_libraries(your_target PRIVATE morton::morton)
+```
+
+…or installed and found via `find_package` (an `install` exports a CMake
+package config; Conan recipe in `conanfile.py`, vcpkg port in
+`packaging/vcpkg/morton/`):
+
+```cmake
+find_package(morton CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE morton::morton)
 ```
 
@@ -133,14 +147,17 @@ Every call runs over whole arrays in compiled code. The arithmetic `shift` is
 ## Repository layout
 
 ```
-include/morton/      the library: morton.hpp, iterate.hpp, batch.hpp, octree.hpp
+include/morton/      the library: morton.hpp, iterate.hpp, batch.hpp, wide_uint.hpp
 tests/               doctest suite (encode/decode, arithmetic, constexpr, wide,
-                     neighbours, octree, batch, iterate)
+                     neighbours, batch, iterate)
 benchmarks/          C++ micro-benchmarks (vs libmorton) + batch/SIMD benchmark
 bindings/python/     ctypes + NumPy wrapper and pytest tests
-pyproject.toml       scikit-build-core wheel build
-.github/workflows/   CI matrix (gcc/clang/MSVC x BMI2 x Debug/Release, Python, docs)
-docs/                EVALUATION.md (vs prior art), ROADMAP.md, Doxyfile
+pyproject.toml       scikit-build-core wheel build + cibuildwheel config
+conanfile.py         Conan recipe;  packaging/vcpkg/  vcpkg port
+cmake/               CMake package-config template (find_package(morton))
+.github/workflows/   ci.yml (build matrix) + release.yml (PyPI wheels on tag)
+docs/                EVALUATION.md, ROADMAP.md, HILBERT_GPU_NOTES.md, Doxyfile
+octree/              sibling project: linear octree on this library (being split out)
 legacy/              the original arbitrary-width BitArray + octree prototype
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```

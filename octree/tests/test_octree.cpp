@@ -1,10 +1,10 @@
 #include "doctest.h"
-#include "morton/octree.hpp"
+#include "morton_octree/octree.hpp"
 
 #include <array>
 #include <cstdint>
 
-using namespace morton;
+using namespace morton_octree;
 
 TEST_CASE("uniform quadtree: point location is correct everywhere") {
     using Tree = Octree<2, 6, int>;  // 64x64 domain

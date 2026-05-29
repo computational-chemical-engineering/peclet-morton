@@ -15,7 +15,10 @@ option(MORTON_ENABLE_BMI2 "Use BMI2 PDEP/PEXT for encode/decode" ON)
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-mbmi2" MORTON_HAS_MBMI2)
 if(MORTON_ENABLE_BMI2 AND MORTON_HAS_MBMI2)
-    target_compile_options(morton INTERFACE -mbmi2)
+    # Only GCC/Clang understand -mbmi2; guard so the flag is safe to propagate
+    # to consumers of the installed package (MSVC/other compilers ignore it).
+    target_compile_options(morton INTERFACE
+        $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-mbmi2>)
 endif()
 
 # Wheel mode (driven by scikit-build-core via the root pyproject.toml): build
@@ -62,12 +65,30 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 endif()
 
 # ---------------------------------------------------------------------------
-# Install (header-only)
+# Install + CMake package config so consumers can `find_package(morton)`
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(MORTON_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/morton)
+
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS morton EXPORT mortonTargets)
 install(EXPORT mortonTargets
-    FILE mortonTargets.cmake
+    FILE morton-targets.cmake
     NAMESPACE morton::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/morton)
+    DESTINATION ${MORTON_CMAKE_DIR})
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/morton-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/morton-config.cmake
+    INSTALL_DESTINATION ${MORTON_CMAKE_DIR})
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/morton-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+    ARCH_INDEPENDENT)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/morton-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/morton-config-version.cmake
+    DESTINATION ${MORTON_CMAKE_DIR})

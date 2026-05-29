@@ -56,9 +56,19 @@ Interleaves `Dim` coordinates of `Bits` bits each. `Dim*Bits <= 64` uses a built
 
 `batch::add/sub/step/encode2/encode3` over arrays. The masked-add loop auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`); ~1.7× over scalar when cache-resident, memory-bound parity otherwise (`benchmarks/bench_batch.cpp`).
 
-### `morton/octree.hpp` — `Octree<Dim,Bits,T>`
+### `morton/wide_uint.hpp` — codes wider than 128 bits
 
-Linear octree/quadtree over `std::map<Morton,Cell>` (Cell = `{level, value}`), keyed by cell origin (low `level*Dim` bits zero). `find` uses `upper_bound` + `ancestor(level)` check; `face_neighbor` steps one cell-width with `try_add`/`try_sub` then `find`; `refine` splits into `2^Dim` children via `child()`. This is the new-core replacement for `legacy/octree.hpp`.
+`detail::wide_uint<W>` is a minimal fixed-width (`W` × `u64`, little-endian) unsigned providing exactly the operators `Morton` uses (`+ - & | ^ ~ << >>`, comparisons, conversions to `u64`/`__int128`). `uint_for` selects it automatically when `Dim*Bits` exceeds the builtin width (64, or 128 with `__int128`). Cap is `MORTON_MAX_BITS` (default 256). The Morton class body is unchanged — it's all operators — so 192-bit (`Morton<3,64>`) and 256-bit (`Morton<2,128>`) "just work". Don't tune `wide_uint` for speed unless it becomes a hot path; it's deliberately simple.
+
+### Octree → sibling `octree/` project
+
+The octree is **no longer part of this library**. It moved to `octree/` (`morton_octree::Octree`, `octree/include/morton_octree/octree.hpp`), a separate project that depends on `morton::morton`. See `octree/PLAN.md`. `legacy/octree.hpp` remains the original prototype/reference.
+
+## Packaging / distribution
+
+- **CMake**: `install` exports a package config (`cmake/morton-config.cmake.in` → `find_package(morton CONFIG)` → `morton::morton`). The `-mbmi2` interface flag is guarded by `$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>` so it's safe to propagate to consumers.
+- **Conan** `conanfile.py`, **vcpkg** `packaging/vcpkg/morton/` (set REF/SHA512 at release).
+- **Python wheels**: `.github/workflows/release.yml` + cibuildwheel build the **portable software path** (`MORTON_ENABLE_BMI2=OFF` via `CMAKE_ARGS`) — a BMI2 wheel would SIGILL on old CPUs. Source `pip install .` stays BMI2-on. Runtime BMI2 dispatch is the roadmap fix for this trade-off.
 
 ## Conventions / gotchas
 

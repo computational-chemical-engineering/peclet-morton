@@ -2,10 +2,12 @@
 
 Where this library stands and what to do with it.
 
-## Status today (v0.2)
+## Status today (v0.3)
 
 The v0.1 core plus the entire near/medium-term roadmap below is now
-**implemented and tested** (27 doctest cases, ~1.4M assertions; pytest; CI; docs):
+**implemented and tested** (26 doctest cases, ~1.4M assertions; pytest; CI; docs);
+the v0.2→v0.3 additions (wide codes, packaging, release pipeline, octree split)
+are listed in "Done since v0.2" further down:
 
 - Header-only C++17 core (`Morton<Dim, Bits>`): BMI2 encode/decode with portable
   software fallback; O(1) per-axis `inc/dec/add/sub`, `neighbor`, `set`, Z-order
@@ -40,22 +42,38 @@ The v0.1 core plus the entire near/medium-term roadmap below is now
   (`benchmarks/bench_batch.cpp`) confirms ~1.7× over scalar when cache-resident
   and memory-bound parity out of cache — exactly the predicted behaviour.
 
+## Done since v0.2
+
+- ✅ **Codes > 128 bits** — `morton/wide_uint.hpp` provides a fixed-width
+  word-array unsigned (`+ - & | ^ ~ << >>`, comparisons) so `Morton<Dim,Bits>`
+  works unchanged up to `MORTON_MAX_BITS` (default 256; raise to go wider).
+  Tested for 192-bit (`Morton<3,64>`) and 256-bit (`Morton<2,128>`) codes on
+  both the BMI2 and software paths.
+- ✅ **C++ packaging** — CMake package-config export (`find_package(morton)` →
+  `morton::morton`), verified by an external consumer build. Conan recipe
+  (`conanfile.py`) and a vcpkg port (`packaging/vcpkg/morton/`).
+- ✅ **PyPI release pipeline** — `cibuildwheel` config + `.github/workflows/
+  release.yml` (manylinux/musllinux/macOS/Windows, trusted publishing on tag).
+  **Released wheels build the portable software path** (`MORTON_ENABLE_BMI2=OFF`)
+  so they never SIGILL on a non-BMI2 CPU; source installs stay BMI2-fast.
+- ✅ **Octree split out** — moved to the sibling `octree/` project
+  (`morton_octree::Octree`), which depends on this library. 2:1 balancing,
+  cross-level neighbour queries and bulk construction are tracked in
+  [`../octree/PLAN.md`](../octree/PLAN.md), not here.
+
 ## Remaining / future work
 
-- **Publish to PyPI** with `cibuildwheel` to produce manylinux/macos/windows
-  wheels (the build is wheel-ready; only the release pipeline is missing).
-- **C++ packaging**: vcpkg / Conan / CMake package config export so
-  `find_package(morton)` works from an install tree (install rules exist).
-- **Explicit AVX-512** batch encode (libmorton-style) for the cases where the
-  bulk path is *not* memory-bound (cache-resident transforms).
-- **Codes > 128 bits** via a small fixed word-array backend (the arithmetic
-  generalises with inter-word carry); reuse the legacy `BitArray` only as the
-  slow reference.
-- **Hilbert curve** option alongside Morton (better locality); the arithmetic
-  framework (BIGMIN/LITMAX, neighbour stepping) largely carries over.
-- **GPU / SYCL** batch kernels for the encode/arithmetic loops.
-- **2:1 balancing** and parent/child iteration on the octree (the legacy
-  prototype's unfinished `balanceTree`).
+- **Runtime BMI2 dispatch** so a single distributed binary uses PDEP/PEXT when
+  the CPU has it and the software path otherwise (removes the build-time
+  portability/speed trade-off the wheels currently make).
+- **Explicit AVX-512** batch encode (libmorton-style) for cache-resident
+  transforms where the bulk path is *not* memory-bound. (Deferred: no AVX-512
+  on the dev machine, so it would ship untested — needs CI hardware first.)
+- **Hilbert curve** option alongside Morton, and **GPU/SYCL** batch kernels:
+  larger, separable efforts — design notes in
+  [`HILBERT_GPU_NOTES.md`](HILBERT_GPU_NOTES.md).
+- **Codes > 256 bits**: just raise `MORTON_MAX_BITS`; revisit `wide_uint`
+  performance (it is intentionally simple, not tuned) if that becomes a hot path.
 
 ## Positioning
 

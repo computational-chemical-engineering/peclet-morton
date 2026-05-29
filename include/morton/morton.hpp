@@ -26,12 +26,21 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "morton/wide_uint.hpp"
+
 #if defined(__BMI2__)
 #include <immintrin.h>
 #endif
 
 #if defined(__SIZEOF_INT128__)
 #define MORTON_HAS_INT128 1
+#endif
+
+// Maximum supported code width (Dim * Bits). Codes <= 64 use a built-in
+// integer, <= 128 use __uint128_t (where available), and wider codes use the
+// software wide_uint<W> backend.
+#ifndef MORTON_MAX_BITS
+#define MORTON_MAX_BITS 256
 #endif
 
 namespace morton {
@@ -42,21 +51,28 @@ namespace detail {
 using uint128_t = unsigned __int128;
 #endif
 
-// Smallest unsigned integer type that holds at least NBits bits.
+// Smallest unsigned type that holds at least NBits bits: a built-in where one
+// exists, otherwise a wide_uint of the right number of 64-bit words.
 template <unsigned NBits>
 struct uint_for {
-    using type = std::conditional_t<
+#if defined(MORTON_HAS_INT128)
+    static constexpr unsigned builtin_max = 128;
+#else
+    static constexpr unsigned builtin_max = 64;
+#endif
+    using builtin = std::conditional_t<
         (NBits <= 8), std::uint8_t,
         std::conditional_t<
             (NBits <= 16), std::uint16_t,
-            std::conditional_t<
-                (NBits <= 32), std::uint32_t,
+            std::conditional_t<(NBits <= 32), std::uint32_t,
 #if defined(MORTON_HAS_INT128)
-                std::conditional_t<(NBits <= 64), std::uint64_t, uint128_t>
+                               std::conditional_t<(NBits <= 64), std::uint64_t, uint128_t>
 #else
-                std::uint64_t
+                               std::uint64_t
 #endif
-                >>>;
+                               >>>;
+    using type = std::conditional_t<(NBits <= builtin_max), builtin,
+                                     wide_uint<(NBits + 63) / 64>>;
 };
 template <unsigned NBits>
 using uint_for_t = typename uint_for<NBits>::type;
@@ -122,11 +138,8 @@ template <unsigned Dim, unsigned Bits>
 class Morton {
     static_assert(Dim >= 1, "Dim must be >= 1");
     static_assert(Bits >= 1, "Bits must be >= 1");
-#if defined(MORTON_HAS_INT128)
-    static_assert(Dim * Bits <= 128, "Dim * Bits must be <= 128");
-#else
-    static_assert(Dim * Bits <= 64, "Dim * Bits must be <= 64 (no __int128)");
-#endif
+    static_assert(Dim * Bits <= MORTON_MAX_BITS,
+                  "Dim * Bits exceeds MORTON_MAX_BITS (raise it if you need wider codes)");
 
 public:
     static constexpr unsigned dimensions = Dim;
