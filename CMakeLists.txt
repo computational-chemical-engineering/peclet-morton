@@ -18,6 +18,15 @@ if(MORTON_ENABLE_BMI2 AND MORTON_HAS_MBMI2)
     target_compile_options(morton INTERFACE -mbmi2)
 endif()
 
+# Wheel mode (driven by scikit-build-core via the root pyproject.toml): build
+# only the Python extension and install it into the package directory.
+option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)
+if(MORTON_WHEEL)
+    add_subdirectory(bindings)
+    install(TARGETS mortonarith_c LIBRARY DESTINATION mortonarith)
+    return()
+endif()
+
 # Only build the extras when this is the top-level project.
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     option(MORTON_BUILD_TESTS "Build the test suite" ON)
@@ -39,6 +48,16 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     endif()
     if(MORTON_BUILD_BINDINGS)
         add_subdirectory(bindings)
+    endif()
+
+    # `cmake --build build --target docs` (if Doxygen is installed)
+    find_package(Doxygen)
+    if(DOXYGEN_FOUND)
+        add_custom_target(docs
+            COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/docs/Doxyfile
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Generating API documentation with Doxygen"
+            VERBATIM)
     endif()
 endif()
 

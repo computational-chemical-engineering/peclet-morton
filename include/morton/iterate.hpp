@@ -100,7 +100,91 @@ typename Morton<Dim, Bits>::code_type bigmin(
     return result;
 }
 
+// Tropf-Herzog combined LITMAX/BIGMIN. Given Z-order box corners
+// [zmin, zmax] and a probe `z`, computes:
+//   bigmin = smallest in-box code strictly greater than z, and
+//   litmax = largest  in-box code strictly less than z.
+// (When the respective value does not exist the result is clamped to a box
+// corner; callers that have already established z is outside the box on the
+// relevant side get the meaningful answer.)
+template <unsigned Dim, unsigned Bits>
+void litmax_bigmin(typename Morton<Dim, Bits>::code_type zmin,
+                   typename Morton<Dim, Bits>::code_type zmax,
+                   typename Morton<Dim, Bits>::code_type z,
+                   typename Morton<Dim, Bits>::code_type& litmax,
+                   typename Morton<Dim, Bits>::code_type& bigmin) {
+    using M = Morton<Dim, Bits>;
+    using code = typename M::code_type;
+
+    litmax = zmin;
+    bigmin = zmax;
+    for (int i = int(M::code_bits) - 1; i >= 0; --i) {
+        const unsigned d = unsigned(i) % Dim;
+        const code bit = code(1) << i;
+        const code below = M::axis_mask(d) & (bit - 1);  // same-dim bits below i
+
+        const int zb = int((z >> i) & 1);
+        const int lb = int((zmin >> i) & 1);
+        const int hb = int((zmax >> i) & 1);
+        const int v = (zb << 2) | (lb << 1) | hb;
+
+        switch (v) {
+            case 0b000:
+            case 0b111:
+                break;
+            case 0b001:
+                bigmin = (zmin & ~below) | bit;  // LOAD(zmin, i, 1)
+                zmax = (zmax & ~bit) | below;    // LOAD(zmax, i, 0)
+                break;
+            case 0b011:
+                bigmin = zmin;
+                return;
+            case 0b100:
+                litmax = zmax;
+                return;
+            case 0b101:
+                litmax = (zmax & ~bit) | below;  // LOAD(zmax, i, 0)
+                zmin = (zmin & ~below) | bit;    // LOAD(zmin, i, 1)
+                break;
+            default:  // 010, 110 are impossible for zmin <= zmax
+                break;
+        }
+    }
+}
+
 }  // namespace detail
+
+/// Smallest Morton code in the inclusive box [lo, hi] that is strictly greater
+/// than `probe`. Returns false if there is none.
+template <unsigned Dim, unsigned Bits>
+bool bigmin_in_box(const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& lo,
+                   const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& hi,
+                   Morton<Dim, Bits> probe, Morton<Dim, Bits>& out) {
+    using M = Morton<Dim, Bits>;
+    const auto zmin = M::encode(lo).code();
+    const auto zmax = M::encode(hi).code();
+    if (probe.code() >= zmax) return false;
+    typename M::code_type lm, bm;
+    detail::litmax_bigmin<Dim, Bits>(zmin, zmax, probe.code(), lm, bm);
+    out = M::from_code(bm);
+    return true;
+}
+
+/// Largest Morton code in the inclusive box [lo, hi] that is strictly less than
+/// `probe`. Returns false if there is none.
+template <unsigned Dim, unsigned Bits>
+bool litmax_in_box(const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& lo,
+                   const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& hi,
+                   Morton<Dim, Bits> probe, Morton<Dim, Bits>& out) {
+    using M = Morton<Dim, Bits>;
+    const auto zmin = M::encode(lo).code();
+    const auto zmax = M::encode(hi).code();
+    if (probe.code() <= zmin) return false;
+    typename M::code_type lm, bm;
+    detail::litmax_bigmin<Dim, Bits>(zmin, zmax, probe.code(), lm, bm);
+    out = M::from_code(lm);
+    return true;
+}
 
 /// Test whether `m` lies inside the inclusive box [lo, hi].
 template <unsigned Dim, unsigned Bits>
@@ -137,7 +221,8 @@ void for_each_in_box_zorder(const std::array<typename Morton<Dim, Bits>::coord_t
             if (z == zmax) break;
             ++z;
         } else {
-            code next = detail::bigmin<Dim, Bits>(zmin, zmax, z);
+            code lm, next;
+            detail::litmax_bigmin<Dim, Bits>(zmin, zmax, z, lm, next);
             if (next <= z) break;  // safety: guarantee forward progress
             z = next;
         }

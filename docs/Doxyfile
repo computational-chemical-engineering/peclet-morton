@@ -1,0 +1,42 @@
+# Doxygen configuration for the morton-arithmetic library.
+# Generate docs with:   doxygen docs/Doxyfile
+# Output:               docs/doxygen/html/index.html
+
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "morton-arithmetic"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Fast Morton (Z-order) codes with O(1) arithmetic"
+OUTPUT_DIRECTORY       = docs/doxygen
+CREATE_SUBDIRS         = NO
+FULL_PATH_NAMES        = NO
+
+# Inputs ---------------------------------------------------------------------
+INPUT                  = include README.md docs/EVALUATION.md docs/ROADMAP.md
+FILE_PATTERNS          = *.hpp
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+
+# Extraction -----------------------------------------------------------------
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+EXTRACT_PRIVATE        = NO
+JAVADOC_AUTOBRIEF      = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARNINGS               = YES
+
+# Preprocessing: define feature macros so the documented declarations are the
+# ones a typical (BMI2 + __int128) build sees.
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+PREDEFINED             = __BMI2__=1 \
+                         MORTON_HAS_INT128=1 \
+                         __SIZEOF_INT128__=16
+
+# Output ---------------------------------------------------------------------
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HTML_OUTPUT            = html
+SORT_MEMBER_DOCS       = NO

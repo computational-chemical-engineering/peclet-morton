@@ -86,6 +86,43 @@ TEST_CASE("Z-order successor/predecessor is integer ++/--") {
     CHECK(top == zero);
 }
 
+TEST_CASE("saturating and checked arithmetic clamp instead of wrapping") {
+    using M = Morton<2, 8>;  // coord_max == 255
+    SUBCASE("add_sat clamps at coord_max") {
+        M m = M::encode(std::uint8_t(250), std::uint8_t(7));
+        m.add_sat(0, 100);
+        CHECK(m.get(0) == 255);
+        CHECK(m.get(1) == 7);  // other axis untouched
+    }
+    SUBCASE("sub_sat clamps at 0") {
+        M m = M::encode(std::uint8_t(3), std::uint8_t(7));
+        m.sub_sat(0, 100);
+        CHECK(m.get(0) == 0);
+        CHECK(m.get(1) == 7);
+    }
+    SUBCASE("try_add refuses overflow and leaves code unchanged") {
+        M m = M::encode(std::uint8_t(250), std::uint8_t(7));
+        CHECK_FALSE(m.try_add(0, 100));
+        CHECK(m.get(0) == 250);
+        CHECK(m.try_add(0, 5));
+        CHECK(m.get(0) == 255);
+    }
+    SUBCASE("try_sub refuses underflow") {
+        M m = M::encode(std::uint8_t(3), std::uint8_t(7));
+        CHECK_FALSE(m.try_sub(0, 100));
+        CHECK(m.get(0) == 3);
+        CHECK(m.try_sub(0, 3));
+        CHECK(m.get(0) == 0);
+    }
+    SUBCASE("saturating matches wrapping when no overflow") {
+        M a = M::encode(std::uint8_t(10), std::uint8_t(20));
+        M b = a;
+        a.add(0, 5);
+        b.add_sat(0, 5);
+        CHECK(a == b);
+    }
+}
+
 TEST_CASE("add is consistent with repeated inc") {
     using M = Morton<2, 10>;
     std::mt19937_64 rng(3);

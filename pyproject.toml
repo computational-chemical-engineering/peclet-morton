@@ -1,0 +1,34 @@
+# Root build configuration for the `mortonarith` Python wheel.
+#
+# Uses scikit-build-core: `pip install .` invokes CMake in MORTON_WHEEL mode,
+# which compiles the C-ABI extension (bindings/morton_c.cpp) and installs the
+# shared library into the `mortonarith` package. Because the whole repository
+# is the source tree, the build is self-contained (the C++ headers in include/
+# and bindings/ are available during an isolated build).
+
+[build-system]
+requires = ["scikit-build-core>=0.5", "numpy>=1.20"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mortonarith"
+version = "0.1.0"
+description = "Fast Morton (Z-order) codes with O(1) arithmetic, vectorised for NumPy"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Frank Peters" }]
+dependencies = ["numpy>=1.20"]
+
+[project.urls]
+Homepage = "https://github.com/computational-chemical-engineering/morton_artithmetic"
+
+[tool.scikit-build]
+minimum-version = "0.8"
+cmake.version = ">=3.16"
+cmake.args = ["-DMORTON_WHEEL=ON"]
+wheel.packages = ["bindings/python/mortonarith"]
+sdist.include = ["include", "bindings", "CMakeLists.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["bindings/python/tests"]

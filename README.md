@@ -56,18 +56,29 @@ operations, which libmorton and similar libraries do not provide.
 ## Design
 
 - **Header-only**, C++17, no dependencies. `#include "morton/morton.hpp"`.
-- `Morton<Dim, Bits>` interleaves `Dim` coordinates of `Bits` bits each
-  (`Dim * Bits ≤ 64`); the code is stored in the smallest unsigned integer that
-  fits.
+- `Morton<Dim, Bits>` interleaves `Dim` coordinates of `Bits` bits each; the code
+  is stored in the smallest unsigned integer that fits. `Dim * Bits ≤ 64` uses a
+  built-in integer; **65–128 bits use `__uint128_t`** where available, so 3D
+  32-bit (`Morton3D32`, 96-bit) and 2D 64-bit (`Morton2D64`, 128-bit) work too.
 - Encode/decode use **BMI2 `PDEP`/`PEXT`** when compiled with `-mbmi2`, with a
-  portable constexpr software fallback otherwise. Both paths are tested for
-  agreement.
-- Arithmetic wraps modulo `2^Bits` per axis (well-defined, branchless).
-- `morton/iterate.hpp` adds region traversal: `for_each_in_box` (row-major,
-  arithmetic) and `for_each_in_box_zorder` (Z-order, via the Tropf-Herzog
-  BIGMIN range-search algorithm).
+  portable software fallback otherwise. Both paths are tested for agreement.
+- **`constexpr`**: the software path runs at compile time (selected via
+  `__builtin_is_constant_evaluated()`), so you can build lookup tables in
+  `constexpr`.
+- Arithmetic wraps modulo `2^Bits` per axis (branchless); `add_sat`/`sub_sat`/
+  `try_add`/`try_sub` clamp or refuse instead of wrapping.
 
-Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`.
+### Headers
+
+| header | provides |
+|---|---|
+| `morton/morton.hpp` | `Morton<Dim,Bits>`: encode/decode, axis arithmetic, saturating ops, `face_neighbors`/`all_neighbors`, `ancestor`/`child` hierarchy, Z-order `++/--` |
+| `morton/iterate.hpp` | `for_each_in_box` (row-major), `for_each_in_box_zorder` (Z-order), and the Tropf-Herzog range-search pair `bigmin_in_box` / `litmax_in_box` |
+| `morton/batch.hpp` | vectorised bulk `add`/`sub`/`step`/`encode` over arrays (AVX2 auto-vectorised) |
+| `morton/octree.hpp` | `Octree<Dim,Bits,T>`: linear octree/quadtree with point location, face neighbours and refinement built on the arithmetic core |
+
+Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`,
+`Morton3D32`, `Morton2D64`.
 
 ## Build, test, benchmark
 
@@ -93,17 +104,26 @@ region iterators against brute force (>1M assertions).
 ## Python
 
 A vectorised NumPy interface (pure `ctypes`, no pybind11/native build deps
-beyond a C++ compiler) lives in `bindings/python`:
+beyond a C++ compiler). Install as a wheel with scikit-build-core:
 
 ```bash
-cmake --build build --target mortonarith_c        # builds the .so into the package
-PYTHONPATH=bindings/python python3 -c "
+pip install .            # builds the extension and bundles it into the wheel
+python -m pytest bindings/python/tests -q
+```
+
+```python
 import numpy as np, mortonarith as ma
 x = np.arange(1000, dtype=np.uint32); y = x * 2
 codes = ma.encode(x, y, bits=32)
 shifted = ma.shift(codes, axis=0, delta=+1, dims=2, bits=32)  # +1 in x, no decode
 print(ma.decode(shifted, dims=2, bits=32))
-"
+```
+
+For a quick dev loop without installing, drop the `.so` next to the package and
+use `PYTHONPATH`:
+
+```bash
+cmake --build build --target mortonarith_c
 PYTHONPATH=bindings/python python3 -m pytest bindings/python/tests -q
 ```
 
@@ -113,11 +133,14 @@ Every call runs over whole arrays in compiled code. The arithmetic `shift` is
 ## Repository layout
 
 ```
-include/morton/      the library (morton.hpp, iterate.hpp)
-tests/               doctest suite
-benchmarks/          C++ micro-benchmarks (vs libmorton)
+include/morton/      the library: morton.hpp, iterate.hpp, batch.hpp, octree.hpp
+tests/               doctest suite (encode/decode, arithmetic, constexpr, wide,
+                     neighbours, octree, batch, iterate)
+benchmarks/          C++ micro-benchmarks (vs libmorton) + batch/SIMD benchmark
 bindings/python/     ctypes + NumPy wrapper and pytest tests
-docs/                EVALUATION.md (vs prior art) and ROADMAP.md
+pyproject.toml       scikit-build-core wheel build
+.github/workflows/   CI matrix (gcc/clang/MSVC x BMI2 x Debug/Release, Python, docs)
+docs/                EVALUATION.md (vs prior art), ROADMAP.md, Doxyfile
 legacy/              the original arbitrary-width BitArray + octree prototype
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```

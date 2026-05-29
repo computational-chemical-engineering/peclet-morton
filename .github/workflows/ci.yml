@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ---- C++ tests on Linux/macOS, gcc & clang, BMI2 on/off, Debug/Release ----
+  cpp:
+    name: ${{ matrix.os }} / ${{ matrix.cc }} / bmi2=${{ matrix.bmi2 }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        bmi2: [ON, OFF]
+        build_type: [Debug, Release]
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - os: macos-latest
+            cc: clang
+            cxx: clang++
+        # also run clang on Linux
+        exclude: []
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DMORTON_ENABLE_BMI2=${{ matrix.bmi2 }}
+          -DMORTON_BUILD_BINDINGS=OFF
+      - name: Build
+        run: cmake --build build -j
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # ---- clang on Linux (separate so the include: above stays simple) ---------
+  cpp-linux-clang:
+    name: ubuntu / clang / bmi2=${{ matrix.bmi2 }} / ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bmi2: [ON, OFF]
+        build_type: [Debug, Release]
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DMORTON_ENABLE_BMI2=${{ matrix.bmi2 }} -DMORTON_BUILD_BINDINGS=OFF
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure
+
+  # ---- C++ tests on Windows / MSVC ------------------------------------------
+  cpp-msvc:
+    name: windows / msvc / ${{ matrix.build_type }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      # MSVC has no __int128 and does not define __BMI2__, so the portable
+      # software path is exercised here; CMake only adds -mbmi2 if supported.
+      - run: cmake -S . -B build -DMORTON_BUILD_BINDINGS=OFF
+      - run: cmake --build build --config ${{ matrix.build_type }}
+      - run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure
+
+  # ---- Python wheel build + tests across versions ---------------------------
+  python:
+    name: python ${{ matrix.python }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install package (builds the extension via scikit-build-core)
+        run: pip install .
+      - name: Test (from a clean dir, against the installed package)
+        run: |
+          pip install pytest numpy
+          cd "${{ runner.temp }}"
+          python -m pytest "${{ github.workspace }}/bindings/python/tests" -q
+
+  # ---- Doxygen build (docs must generate without warnings) ------------------
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y doxygen
+      - run: doxygen docs/Doxyfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/doxygen/html

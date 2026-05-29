@@ -1,62 +1,61 @@
 # Roadmap / plan
 
-Where this library stands and what to do with it. Ordered by value-to-effort.
+Where this library stands and what to do with it.
 
-## Status today (v0.1)
+## Status today (v0.2)
 
-Done in this iteration:
+The v0.1 core plus the entire near/medium-term roadmap below is now
+**implemented and tested** (27 doctest cases, ~1.4M assertions; pytest; CI; docs):
 
-- Header-only C++17 core (`Morton<Dim, Bits>`, `Dim*Bits ≤ 64`): BMI2
-  encode/decode with portable software fallback; O(1) per-axis
-  `inc/dec/add/sub`, `neighbor`, `set`, Z-order `++`/`--`, comparisons.
-- Region iteration (`for_each_in_box`, `for_each_in_box_zorder` via BIGMIN).
-- doctest suite (>1M assertions): cross-checked against a bit-by-bit reference
-  and against libmorton; arithmetic and iterators validated against brute force.
-- CMake (interface target `morton::morton`, `ctest`, install rules).
-- C ABI shim + vectorised NumPy/ctypes Python package + pytest.
-- Benchmarks vs libmorton; honest profiling write-up in `EVALUATION.md`.
+- Header-only C++17 core (`Morton<Dim, Bits>`): BMI2 encode/decode with portable
+  software fallback; O(1) per-axis `inc/dec/add/sub`, `neighbor`, `set`, Z-order
+  `++`/`--`, comparisons.
+- ✅ **(1) CI matrix** — `.github/workflows/ci.yml`: gcc/clang/MSVC ×
+  {BMI2 on/off} × {Debug/Release} running `ctest`, plus a Python-version matrix
+  and a Doxygen build. The software fallback is exercised on the BMI2=OFF cells.
+- ✅ **(2) `constexpr` encode/decode/arithmetic** — selects the software path at
+  compile time via `__builtin_is_constant_evaluated()` (works at C++17); see
+  `tests/test_constexpr.cpp` for compile-time lookup-table construction.
+- ✅ **(3) Saturating / checked arithmetic** — `add_sat`, `sub_sat`, `try_add`,
+  `try_sub` clamp or refuse instead of wrapping.
+- ✅ **(4) Real Python build** — `scikit-build-core`; `pip install .` builds the
+  extension and produces a proper wheel (`mortonarith-*.whl`) with the `.so`
+  bundled. (PyPI publishing still pending — see below.)
+- ✅ **(5) Docs site** — Doxygen config (`docs/Doxyfile`) + `docs` CMake target.
+- ✅ **(6) Wider codes (> 64 bits)** — `__uint128_t` storage where available, so
+  3D 32-bit (96-bit code) and 2D 64-bit (128-bit code) work; software
+  encode/decode for >64 bits, native 128-bit arithmetic. Aliases `Morton3D32`,
+  `Morton2D64`.
+- ✅ **(7) LITMAX companion to BIGMIN** — `morton/iterate.hpp` exposes the full
+  Tropf-Herzog pair (`bigmin_in_box`, `litmax_in_box`, `litmax_bigmin`),
+  validated exhaustively against brute force.
+- ✅ **(8) Neighbour-set + hierarchy helpers** — `face_neighbors()` (von
+  Neumann), `all_neighbors()` (Moore, `3^Dim-1`), `ancestor`/`child`/
+  `child_index`.
+- ✅ **(9) Octree on the new core** — `morton/octree.hpp`: a linear octree/
+  quadtree (`std::map` keyed by Morton origin) with point location, face
+  neighbours and refinement expressed via the core arithmetic.
+- ✅ **(10) SIMD batch arithmetic** — `morton/batch.hpp` (`add`/`sub`/`step`/
+  `encode2`/`encode3`) auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`). Profiling
+  (`benchmarks/bench_batch.cpp`) confirms ~1.7× over scalar when cache-resident
+  and memory-bound parity out of cache — exactly the predicted behaviour.
 
-## Near term — make it a credible open-source library
+## Remaining / future work
 
-1. **CI matrix.** GitHub Actions: gcc/clang/MSVC × {BMI2 on, BMI2 off} ×
-   {Debug, Release}, run `ctest` + pytest. The software fallback path must be
-   exercised on a non-BMI2 build (the tests already pass there locally).
-2. **`constexpr` encode/decode.** The software path is already constexpr-friendly;
-   make `encode`/`decode`/arithmetic usable in constant expressions (the BMI2
-   intrinsics are not constexpr, so select the software path inside
-   `if (std::is_constant_evaluated())`, C++20). Lets users build compile-time
-   lookup tables.
-3. **Signed / saturating arithmetic options.** Currently axis arithmetic wraps
-   mod 2^Bits. Add `add_saturating` and bounds-checked variants for grid code
-   that must not wrap.
-4. **A real Python build.** Replace the manual CMake-drops-an-`.so` step with
-   `scikit-build-core` so `pip install .` produces a proper wheel; publish to
-   PyPI. Consider `pybind11`/`nanobind` if a richer object API is wanted, but the
-   ctypes+bulk-array design is deliberately dependency-free and fast — keep it
-   unless there's a reason not to.
-5. **Docs site.** The README + EVALUATION are enough to start; add Doxygen or a
-   short mdBook with the neighbour/stencil examples.
-
-## Medium term — features that justify the "arithmetic" name
-
-6. **Wider codes (> 64 bits) without losing speed.** Reuse the legacy
-   `BitArray` only as a fallback; provide a `Morton<Dim, Bits>` specialisation
-   backed by `__uint128_t` (and an array of words beyond that) so 3D 32-bit and
-   2D 64-bit work. The arithmetic generalises directly (carry across words).
-7. **LITMAX companion to BIGMIN.** Expose the full Tropf-Herzog pair so callers
-   can drive their own range-search / database-style scans, not just the
-   bundled iterator.
-8. **Neighbour-set helpers.** `face_neighbors()`, `all_neighbors()` (Moore /
-   von Neumann), and parent/child navigation — the operations an octree actually
-   calls. This is the bridge to item 9.
-9. **Port the legacy octree onto the new core.** `legacy/octree.hpp` is the
-   original motivating application. Re-implement it over `Morton<Dim,Bits>`; the
-   `findCell`/neighbour logic becomes the fast arithmetic ops here. This turns
-   the library from "primitives" into "primitives + a flagship user."
-10. **SIMD batch arithmetic.** libmorton has AVX-512 encode; the per-axis
-    arithmetic vectorises cleanly too (it is just masked adds). A batched
-    `shift_many` could widen the Python advantage further. Profile first — the
-    scalar bulk path is already memory-bound in Python.
+- **Publish to PyPI** with `cibuildwheel` to produce manylinux/macos/windows
+  wheels (the build is wheel-ready; only the release pipeline is missing).
+- **C++ packaging**: vcpkg / Conan / CMake package config export so
+  `find_package(morton)` works from an install tree (install rules exist).
+- **Explicit AVX-512** batch encode (libmorton-style) for the cases where the
+  bulk path is *not* memory-bound (cache-resident transforms).
+- **Codes > 128 bits** via a small fixed word-array backend (the arithmetic
+  generalises with inter-word carry); reuse the legacy `BitArray` only as the
+  slow reference.
+- **Hilbert curve** option alongside Morton (better locality); the arithmetic
+  framework (BIGMIN/LITMAX, neighbour stepping) largely carries over.
+- **GPU / SYCL** batch kernels for the encode/arithmetic loops.
+- **2:1 balancing** and parent/child iteration on the octree (the legacy
+  prototype's unfinished `balanceTree`).
 
 ## Positioning
 
