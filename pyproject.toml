@@ -34,12 +34,14 @@ sdist.include = ["include", "bindings", "CMakeLists.txt"]
 testpaths = ["bindings/python/tests"]
 
 # ---------------------------------------------------------------------------
-# Redistributable wheels (cibuildwheel). Built with the *portable* software
-# encode/decode path (MORTON_ENABLE_BMI2=OFF): a wheel that hard-coded the BMI2
-# PDEP/PEXT instructions would crash with SIGILL on CPUs without BMI2. Source
-# installs (`pip install .` / building via CMake) default to BMI2 ON and are
-# fast on the local machine. (Runtime CPU dispatch is a future improvement -
-# see docs/ROADMAP.md.)
+# Redistributable wheels (cibuildwheel). Built *without* -mbmi2 so they never
+# SIGILL on a CPU lacking BMI2, but with MORTON_ENABLE_RUNTIME_DISPATCH=ON so
+# the single portable binary still uses PDEP/PEXT (and the AVX-512 batch
+# kernels) at runtime when the executing CPU supports them, via per-function
+# `target` attributes + a CPUID check. This removes the old portability/speed
+# trade-off: one wheel is both safe on old CPUs and fast on new ones. (On
+# non-x86 / MSVC the dispatch self-disables and the software path is used.)
+# Source installs (`pip install .`) default to BMI2 ON and are fast directly.
 # ---------------------------------------------------------------------------
 [tool.cibuildwheel]
 build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
@@ -49,8 +51,8 @@ test-requires = ["pytest", "numpy"]
 test-command = "python -m pytest {project}/bindings/python/tests -q"
 
 [tool.cibuildwheel.environment]
-CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF"
+CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON"
 
 [tool.cibuildwheel.macos.environment]
-CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF"
+CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON"
 MACOSX_DEPLOYMENT_TARGET = "10.13"

@@ -62,6 +62,44 @@ jobs:
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure
 
+  # ---- AVX-512 + runtime-dispatch validation via Intel SDE ------------------
+  # The CI runners have no AVX-512, so we run the test binaries under Intel SDE,
+  # a userspace functional emulator. -skx emulates Skylake-X (AVX-512), so the
+  # AVX-512 batch kernels in morton/simd.hpp actually execute and are checked
+  # bit-for-bit against the scalar reference. The runtime-dispatch build (no
+  # -mbmi2) is then exercised across -snb (no BMI2 -> software), -hsw (BMI2,
+  # no AVX-512 -> PDEP) and -skx (BMI2 + AVX-512).
+  cpp-avx512-sde:
+    name: ubuntu / gcc / AVX-512 + dispatch via Intel SDE
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Intel SDE
+        run: |
+          set -euo pipefail
+          url="https://downloadmirror.intel.com/915934/sde-external-10.8.0-2026-03-15-lin.tar.xz"
+          curl -sSL -o sde.tar.xz "$url"
+          echo "50b320cd226acef7a491f5b321fc1be3c3c7984f9e27a456e64894b5b0979dd3  sde.tar.xz" | sha256sum -c -
+          mkdir -p "$HOME/sde" && tar -xJf sde.tar.xz -C "$HOME/sde" --strip-components=1
+          echo "$HOME/sde" >> "$GITHUB_PATH"
+      - name: Build (default, BMI2 on; AVX-512 kernels compiled via target attribute)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMORTON_BUILD_BINDINGS=OFF
+          cmake --build build -j
+      - name: Tests under SDE Skylake-X (AVX-512 batch path executes)
+        run: sde64 -skx -- ./build/tests/morton_tests
+      - name: Build runtime-dispatch variant (no -mbmi2)
+        run: |
+          cmake -S . -B build_rt -DCMAKE_BUILD_TYPE=Release \
+            -DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON \
+            -DMORTON_BUILD_BINDINGS=OFF
+          cmake --build build_rt -j
+      - name: Runtime-dispatch tests across emulated CPUs
+        run: |
+          sde64 -snb -- ./build_rt/tests/morton_tests   # Sandy Bridge: no BMI2/AVX-512 -> software
+          sde64 -hsw -- ./build_rt/tests/morton_tests   # Haswell:     BMI2, no AVX-512 -> PDEP
+          sde64 -skx -- ./build_rt/tests/morton_tests   # Skylake-X:   BMI2 + AVX-512
+
   # ---- C++ tests on Windows / MSVC ------------------------------------------
   cpp-msvc:
     name: windows / msvc / ${{ matrix.build_type }}

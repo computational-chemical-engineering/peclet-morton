@@ -67,14 +67,39 @@ are listed in "Done since v0.2" further down:
   device-resident 2D-32 encode on an RTX 5080 (~33× one CPU core); one-shot host
   calls are PCIe-bound (documented).
 
+## Done since v0.3
+
+- ✅ **Runtime BMI2 dispatch** — `MORTON_ENABLE_RUNTIME_DISPATCH` (CMake option /
+  compile define) builds a single binary *without* `-mbmi2` that still uses
+  PDEP/PEXT when the running CPU has BMI2 (software fallback otherwise), via
+  per-function `__attribute__((target("bmi2")))` helpers + a cached
+  `__builtin_cpu_supports` check (`morton/morton.hpp`). The redistributable
+  wheels now build with it on (`pyproject.toml`), so one portable wheel is both
+  SIGILL-safe on old CPUs and BMI2/AVX-512-fast on new ones — removing the old
+  portability/speed trade-off. Self-disables when `-mbmi2` is already set, on
+  non-x86, and under CUDA.
+- ✅ **Explicit AVX-512 batch encode/decode** — `morton/simd.hpp`: hand-written
+  AVX-512 "magic-bits" kernels (8 codes/iteration) for `encode2`/`decode2`
+  (2,32), `encode3`/`decode3` (3,21), and per-axis `add`/`sub` on any 64-bit
+  code. `morton/batch.hpp` dispatches to them at runtime when the CPU has
+  AVX-512F (else the auto-vectorised scalar path); they use a `target` attribute
+  so no global `-mavx512f` is needed. The C ABI / NumPy bindings route through
+  these, so Python gets the speedup too. **No longer ships untested**: CI runs
+  the suite under Intel SDE (`-skx`) so the AVX-512 path is checked bit-for-bit
+  against the scalar reference on ordinary (non-AVX-512) runners; the
+  runtime-dispatch build is also exercised under `-snb`/`-hsw`/`-skx`.
+
 ## Remaining / future work
 
-- **Runtime BMI2 dispatch** so a single distributed binary uses PDEP/PEXT when
-  the CPU has it and the software path otherwise (removes the build-time
-  portability/speed trade-off the wheels currently make).
-- **Explicit AVX-512** batch encode (libmorton-style) for cache-resident
-  transforms where the bulk path is *not* memory-bound. (Deferred: no AVX-512
-  on the dev machine, so it would ship untested — needs CI hardware first.)
+- **AVX-512 on real silicon**: SDE validates *correctness*; a benchmark on an
+  actual AVX-512 host (or a GPU/cloud runner) is still wanted to confirm the
+  expected throughput win for cache-resident bulk encode (`bench_batch` already
+  prints the active path and a `batch::encode2` vs scalar comparison).
+- **Wider SIMD configs**: the AVX-512 encode kernels currently cover the
+  64-bit-code, 32-bit-coord layouts (2,32)/(3,21); 16-bit-coord configs and
+  AVX2-only explicit kernels could be added if profiling warrants.
+- **MSVC runtime dispatch**: the `target`-attribute + `__builtin_cpu_supports`
+  mechanism is GCC/Clang; an `__cpuid`-based path would extend it to MSVC.
 - **GPU follow-ups**: a Z-order **radix sort** (the usual reason to be on the
   GPU), a NumPy-device Python entry point, SYCL/HIP portability, and a GPU CI
   runner. (The CUDA encode/decode/arithmetic backend itself is now done — see

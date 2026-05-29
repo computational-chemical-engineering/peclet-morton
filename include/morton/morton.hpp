@@ -28,7 +28,35 @@
 
 #include "morton/wide_uint.hpp"
 
-#if defined(__BMI2__)
+// ---- x86 ISA feature plumbing ---------------------------------------------
+// MORTON_X86 : building for x86-64 with GCC/Clang for the host (not CUDA/HIP).
+//   Gates the runtime CPU-feature queries and the AVX-512 batch kernels, which
+//   use per-function `target` attributes so they need no global -mavx512f/-mbmi2
+//   and never run unless the executing CPU actually supports the instructions.
+#if (defined(__x86_64__) || defined(_M_X64)) \
+        && (defined(__GNUC__) || defined(__clang__)) \
+        && !defined(__CUDACC__) && !defined(__HIPCC__)
+#define MORTON_X86 1
+#else
+#define MORTON_X86 0
+#endif
+
+// MORTON_ENABLE_RUNTIME_DISPATCH (opt-in, default 0): build a single binary
+// *without* -mbmi2 that still uses PDEP/PEXT when the running CPU has BMI2 and
+// the software fallback otherwise -- removing the build-time portability/speed
+// trade-off (e.g. for distributable wheels). Left off by default so the plain
+// non-BMI2 build stays strictly software (and pdep/pext-free). It self-disables
+// when -mbmi2 is already on (the compile-time intrinsic path is used instead).
+#ifndef MORTON_ENABLE_RUNTIME_DISPATCH
+#define MORTON_ENABLE_RUNTIME_DISPATCH 0
+#endif
+#if MORTON_X86 && MORTON_ENABLE_RUNTIME_DISPATCH && !defined(__BMI2__)
+#define MORTON_X86_RUNTIME_DISPATCH 1
+#else
+#define MORTON_X86_RUNTIME_DISPATCH 0
+#endif
+
+#if MORTON_X86 || defined(__BMI2__)
 #include <immintrin.h>
 #endif
 
@@ -136,6 +164,36 @@ MORTON_HD constexpr Coord compact_sw(Code c, unsigned d) {
         r |= Coord(Coord(c >> (i * Dim + d)) & Coord(1)) << i;
     return r;
 }
+
+#if MORTON_X86
+// Cached runtime CPU-feature queries. __builtin_cpu_supports returns a nonzero
+// bitfield when the feature is present, so compare against 0. The first call
+// triggers detection; results are memoised in function-local statics.
+inline bool cpu_has_bmi2() {
+    static const bool v = __builtin_cpu_supports("bmi2") != 0;
+    return v;
+}
+inline bool cpu_has_avx2() {
+    static const bool v = __builtin_cpu_supports("avx2") != 0;
+    return v;
+}
+inline bool cpu_has_avx512f() {
+    static const bool v = __builtin_cpu_supports("avx512f") != 0;
+    return v;
+}
+#endif
+
+#if MORTON_X86_RUNTIME_DISPATCH
+// Compiled with BMI2 codegen for just these two functions (via the `target`
+// attribute), so the rest of the binary stays portable; only ever called from
+// the !is_consteval() runtime path guarded by cpu_has_bmi2().
+__attribute__((target("bmi2"))) inline std::uint64_t pdep_u64_hw(std::uint64_t v, std::uint64_t m) {
+    return _pdep_u64(v, m);
+}
+__attribute__((target("bmi2"))) inline std::uint64_t pext_u64_hw(std::uint64_t v, std::uint64_t m) {
+    return _pext_u64(v, m);
+}
+#endif
 
 }  // namespace detail
 
@@ -405,6 +463,10 @@ public:
 #if defined(__BMI2__) && !defined(__CUDA_ARCH__)
             if (!detail::is_consteval())
                 return code_type(_pdep_u64(std::uint64_t(x), std::uint64_t(axis_mask(d))));
+#elif MORTON_X86_RUNTIME_DISPATCH
+            // Single-binary path: use PDEP when the running CPU has BMI2.
+            if (!detail::is_consteval() && detail::cpu_has_bmi2())
+                return code_type(detail::pdep_u64_hw(std::uint64_t(x), std::uint64_t(axis_mask(d))));
 #endif
         }
         return detail::spread_sw<Dim, Bits, code_type, coord_type>(x, d);
@@ -415,6 +477,9 @@ public:
 #if defined(__BMI2__) && !defined(__CUDA_ARCH__)
             if (!detail::is_consteval())
                 return coord_type(_pext_u64(std::uint64_t(c), std::uint64_t(axis_mask(d))));
+#elif MORTON_X86_RUNTIME_DISPATCH
+            if (!detail::is_consteval() && detail::cpu_has_bmi2())
+                return coord_type(detail::pext_u64_hw(std::uint64_t(c), std::uint64_t(axis_mask(d))));
 #endif
         }
         return detail::compact_sw<Dim, Bits, code_type, coord_type>(c, d);

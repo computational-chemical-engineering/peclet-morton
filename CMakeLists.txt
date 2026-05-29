@@ -21,6 +21,18 @@ if(MORTON_ENABLE_BMI2 AND MORTON_HAS_MBMI2)
         $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-mbmi2>)
 endif()
 
+# Single-binary runtime ISA dispatch (x86-64 GCC/Clang). Builds *without*
+# -mbmi2 but still uses PDEP/PEXT when the running CPU has BMI2 (software path
+# otherwise), via per-function `target` attributes. Intended to be paired with
+# MORTON_ENABLE_BMI2=OFF (it self-disables when -mbmi2 is on). The AVX-512 batch
+# kernels are always runtime-dispatched and need no option. This lets a portable
+# distributable binary (e.g. a wheel) keep the BMI2/AVX-512 fast paths.
+option(MORTON_ENABLE_RUNTIME_DISPATCH
+    "Single-binary runtime BMI2 dispatch (build without -mbmi2)" OFF)
+if(MORTON_ENABLE_RUNTIME_DISPATCH)
+    target_compile_definitions(morton INTERFACE MORTON_ENABLE_RUNTIME_DISPATCH=1)
+endif()
+
 # Wheel mode (driven by scikit-build-core via the root pyproject.toml): build
 # only the Python extension and install it into the package directory.
 option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)

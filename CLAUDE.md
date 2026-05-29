@@ -10,6 +10,8 @@ Read `docs/EVALUATION.md` for the honest assessment of what this contributes ver
 
 ## Build / test / benchmark
 
+`DEVELOPMENT.md` is the canonical fresh-machine setup (prerequisites, ISA/platform notes, the full CUDA-via-clang toolkit-assembly recipe); the commands below are the day-to-day subset.
+
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
@@ -20,6 +22,18 @@ cmake --build build --target docs                 # Doxygen -> docs/doxygen/html
 
 # software (non-BMI2) path — must also pass:
 cmake -S . -B build_nobmi2 -DMORTON_ENABLE_BMI2=OFF && cmake --build build_nobmi2 -j
+
+# runtime-dispatch path (single portable binary, no -mbmi2, uses PDEP/AVX-512
+# when the CPU has them) — what the wheels build:
+cmake -S . -B build_rt -DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON && cmake --build build_rt -j
+
+# AVX-512 has no hardware on most dev machines / CI; validate it under Intel SDE
+# (userspace emulator, runs on AMD too). -skx => AVX-512 batch path executes:
+sde64 -skx -- ./build/tests/morton_tests
+# runtime-dispatch build across emulated CPUs (BMI2 present/absent):
+sde64 -snb -- ./build_rt/tests/morton_tests   # no BMI2/AVX-512 -> software fallback
+sde64 -hsw -- ./build_rt/tests/morton_tests   # BMI2, no AVX-512 -> PDEP path
+sde64 -skx -- ./build_rt/tests/morton_tests   # BMI2 + AVX-512
 
 # Python: proper wheel via scikit-build-core (pip install . from repo root)
 pip install .                                     # builds extension, bundles .so
@@ -35,13 +49,14 @@ A single doctest case can be run with `./build/tests/morton_tests --test-case="<
 
 ## Architecture (new core)
 
-Header dependency order: `morton.hpp` ← {`iterate.hpp`, `batch.hpp`, `octree.hpp`}.
+Header dependency order: `morton.hpp` ← {`iterate.hpp`, `simd.hpp` ← `batch.hpp`, `octree.hpp`}.
 
 ### `morton/morton.hpp` — `Morton<unsigned Dim, unsigned Bits>`
 
 Interleaves `Dim` coordinates of `Bits` bits each. `Dim*Bits <= 64` uses a built-in `code_type`; **65–128 bits use `__uint128_t`** (guarded by `MORTON_HAS_INT128` / `__SIZEOF_INT128__`), so `Morton3D32` (96-bit) and `Morton2D64` (128-bit) work. Key design points:
 
 - **Encode/decode** go through `deposit`/`extract`. For `code_bits <= 64` they use BMI2 `_pdep_u64`/`_pext_u64` under `#if defined(__BMI2__)`, else a software fallback (`detail::spread_sw`/`compact_sw`). For `code_bits > 64` the software path is always used (PDEP is 64-bit only). Paths are cross-checked in tests; the BMI2=OFF build verifies the fallback emits no pdep/pext.
+- **Runtime dispatch** (`MORTON_ENABLE_RUNTIME_DISPATCH`, opt-in via the CMake option / compile define; gated to `MORTON_X86_RUNTIME_DISPATCH` on x86-64 GCC/Clang when `-mbmi2` is *not* set): a third `deposit`/`extract` branch calls `detail::pdep_u64_hw`/`pext_u64_hw` — `__attribute__((target("bmi2")))` helpers, so PDEP is emitted without a global `-mbmi2` — guarded by the cached `detail::cpu_has_bmi2()` (`__builtin_cpu_supports`). This yields one portable binary that's BMI2-fast at runtime. **Don't enable it by default for the plain BMI2=OFF build** — that build is contractually pdep-free (a test greps for it). It self-disables under `-mbmi2`/CUDA/non-x86. `MORTON_X86` / `cpu_has_bmi2`/`cpu_has_avx2`/`cpu_has_avx512f` live in `detail` and are shared with the SIMD path.
 - **`constexpr`**: `deposit`/`extract`/`encode`/`decode`/arithmetic are `constexpr`. They call the BMI2 intrinsic only when `!detail::is_consteval()` (which uses `__builtin_is_constant_evaluated()`, available at C++17 on GCC/Clang); in constant evaluation the software path runs. Don't "simplify" by removing the `is_consteval()` guard — the intrinsics aren't constexpr.
 - **The headline arithmetic** (`add`/`sub`/`inc`/`dec`/`neighbor`, O(1), branchless) operates on one axis' interleaved bits: to add to axis `d`, fill non-axis bits with 1s (`code | ~M`) so carries ripple across the gaps, add the dilated increment, keep only axis `d` (`& M`), OR back the others. **Wraps mod `2^Bits` per axis.** `add_sat`/`sub_sat`/`try_add`/`try_sub` are the non-wrapping variants.
 - **Neighbour/hierarchy helpers**: `face_neighbors()` (2·Dim, von Neumann), `all_neighbors()` (`3^Dim-1`, Moore), `ancestor(level)`/`child(level,oct)`/`child_index(level)` for octree navigation.
@@ -54,7 +69,11 @@ Interleaves `Dim` coordinates of `Bits` bits each. `Dim*Bits <= 64` uses a built
 
 ### `morton/batch.hpp` — vectorised bulk ops
 
-`batch::add/sub/step/encode2/encode3` over arrays. The masked-add loop auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`); ~1.7× over scalar when cache-resident, memory-bound parity otherwise (`benchmarks/bench_batch.cpp`).
+`batch::add/sub/step/encode2/encode3/decode2/decode3` over arrays. The masked-add loop auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`); ~1.7× over scalar when cache-resident, memory-bound parity otherwise (`benchmarks/bench_batch.cpp`). On x86-64 GCC/Clang (`MORTON_X86`) each function **runtime-dispatches** to the explicit AVX-512 kernels in `simd.hpp` when `detail::cpu_has_avx512f()` and the code is 64-bit — transparently, with bit-for-bit identical results — else it falls through to this scalar loop.
+
+### `morton/simd.hpp` — explicit AVX-512 batch kernels
+
+Hand-written AVX-512 "magic-bits" spread/compact (`detail::avx512::{encode2,decode2,encode3,decode3,add64,sub64}`), 8 codes per iteration, with a scalar tail (so `n` need not be a multiple of 8). Each kernel is `__attribute__((target("avx512f")))`, so the TU needs **no** global `-mavx512f` and the rest of the binary stays portable; they only run when `cpu_has_avx512f()` is true. Coverage is the 64-bit-code, 32-bit-coord layouts: `encode/decode` for `(2,32)` and `(3,21)`, and `add/sub` for any 64-bit code (`(2,32)`,`(3,21)`,`(3,16)`); other layouts use the scalar path. **Validate changes here under Intel SDE** (`sde64 -skx`) — there's usually no AVX-512 hardware locally, and the tests compare the SIMD output against the scalar reference exhaustively.
 
 ### `morton/wide_uint.hpp` — codes wider than 128 bits
 
@@ -78,7 +97,7 @@ The octree is **no longer part of this library**. It moved to `octree/` (`morton
 
 - **CMake**: `install` exports a package config (`cmake/morton-config.cmake.in` → `find_package(morton CONFIG)` → `morton::morton`). The `-mbmi2` interface flag is guarded by `$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>` so it's safe to propagate to consumers.
 - **Conan** `conanfile.py`, **vcpkg** `packaging/vcpkg/morton/` (set REF/SHA512 at release).
-- **Python wheels**: `.github/workflows/release.yml` + cibuildwheel build the **portable software path** (`MORTON_ENABLE_BMI2=OFF` via `CMAKE_ARGS`) — a BMI2 wheel would SIGILL on old CPUs. Source `pip install .` stays BMI2-on. Runtime BMI2 dispatch is the roadmap fix for this trade-off.
+- **Python wheels**: `.github/workflows/release.yml` + cibuildwheel build with `MORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON` (via `CMAKE_ARGS`) — no global `-mbmi2` (so no SIGILL on old CPUs) but PDEP/PEXT and the AVX-512 batch kernels still kick in at runtime via `target`-attribute helpers + CPUID. One wheel, portable *and* fast. (On MSVC/non-x86 the dispatch self-disables → software path.) Source `pip install .` stays BMI2-on. The C ABI shim (`bindings/morton_c.cpp`) routes 64-bit-code configs through `batch::` so Python gets the dispatched paths; `(2,16)` (32-bit code) keeps the per-element path.
 
 ## Conventions / gotchas
 

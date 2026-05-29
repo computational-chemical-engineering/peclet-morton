@@ -49,8 +49,47 @@ cmake -S . -B build_nobmi2 -DMORTON_ENABLE_BMI2=OFF && cmake --build build_nobmi
   MSVC falls back to the `wide_uint` word-array backend. Codes > 128 bits always
   use `wide_uint` (cap `MORTON_MAX_BITS`, default 256; override with
   `-DMORTON_MAX_BITS=...` or `add_compile_definitions`).
-- **AVX-512**: not required. The batch path auto-vectorises to the target ISA;
-  add `-march=native` for the benchmarks on a machine that has wider vectors.
+- **AVX-512**: not required. `morton/batch.hpp` runtime-dispatches the bulk
+  encode/decode/add to explicit AVX-512 kernels (`morton/simd.hpp`) when the CPU
+  has AVX-512F, else the auto-vectorised scalar path runs. The kernels use a
+  per-function `target("avx512f")` attribute, so no global `-mavx512f` is needed.
+
+### Runtime dispatch (one portable binary)
+
+`-DMORTON_ENABLE_RUNTIME_DISPATCH=ON` (pair with `-DMORTON_ENABLE_BMI2=OFF`)
+builds a binary that contains **no** `-mbmi2` codegen globally but still uses
+PDEP/PEXT at runtime when the CPU has BMI2 (software fallback otherwise), via
+`target`-attribute helpers + a CPUID check. This is what the redistributable
+wheels build, so a single wheel is SIGILL-safe on old CPUs yet BMI2/AVX-512-fast
+on new ones. It self-disables under `-mbmi2`, on non-x86, and under MSVC/CUDA.
+
+```bash
+cmake -S . -B build_rt -DCMAKE_BUILD_TYPE=Release \
+  -DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON
+cmake --build build_rt -j
+```
+
+### Testing AVX-512 without AVX-512 hardware (Intel SDE)
+
+Most dev machines and CI runners lack AVX-512, so validate the AVX-512 path
+under [Intel SDE](https://www.intel.com/content/www/us/en/developer/articles/tool/software-development-emulator.html),
+a userspace functional emulator (it runs on AMD too — no special hardware).
+Download the Linux `.tar.xz`, extract it, and run the test binary under it:
+
+```bash
+# (one-time) fetch + unpack SDE somewhere, e.g. ~/sde
+sde64 -skx -- ./build/tests/morton_tests        # Skylake-X: AVX-512 batch path runs
+# the runtime-dispatch build across BMI2-present / -absent CPUs:
+sde64 -snb -- ./build_rt/tests/morton_tests      # Sandy Bridge: no BMI2/AVX-512 -> software
+sde64 -hsw -- ./build_rt/tests/morton_tests      # Haswell:      BMI2, no AVX-512 -> PDEP
+sde64 -skx -- ./build_rt/tests/morton_tests      # Skylake-X:    BMI2 + AVX-512
+```
+
+The test suite compares the SIMD/dispatch output bit-for-bit against the scalar
+reference, so a green run under `-skx` proves the AVX-512 kernels are correct.
+CI does exactly this (the `cpp-avx512-sde` job), so AVX-512 is covered without a
+GPU/AVX-512 runner. (Emulated *timing* is meaningless — benchmark on real
+silicon; `morton_bench_batch` prints the active path and a bulk-encode compare.)
 
 ## Python bindings
 
