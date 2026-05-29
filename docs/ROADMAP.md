@@ -60,6 +60,12 @@ are listed in "Done since v0.2" further down:
   (`morton_octree::Octree`), which depends on this library. 2:1 balancing,
   cross-level neighbour queries and bulk construction are tracked in
   [`../octree/PLAN.md`](../octree/PLAN.md), not here.
+- ✅ **GPU (CUDA) backend** — `cuda/` (`morton::cuda`). The core is marked
+  `__host__ __device__` (`MORTON_HD`), so kernels reuse the exact CPU code path
+  (PDEP guarded out of device code). encode/decode (2D/3D) + per-axis arithmetic;
+  validated bit-for-bit against the CPU library on the GPU. ~51 GMops/s
+  device-resident 2D-32 encode on an RTX 5080 (~33× one CPU core); one-shot host
+  calls are PCIe-bound (documented).
 
 ## Remaining / future work
 
@@ -69,9 +75,12 @@ are listed in "Done since v0.2" further down:
 - **Explicit AVX-512** batch encode (libmorton-style) for cache-resident
   transforms where the bulk path is *not* memory-bound. (Deferred: no AVX-512
   on the dev machine, so it would ship untested — needs CI hardware first.)
-- **Hilbert curve** option alongside Morton, and **GPU/SYCL** batch kernels:
-  larger, separable efforts — design notes in
-  [`HILBERT_GPU_NOTES.md`](HILBERT_GPU_NOTES.md).
+- **GPU follow-ups**: a Z-order **radix sort** (the usual reason to be on the
+  GPU), a NumPy-device Python entry point, SYCL/HIP portability, and a GPU CI
+  runner. (The CUDA encode/decode/arithmetic backend itself is now done — see
+  above.) Design notes in [`HILBERT_GPU_NOTES.md`](HILBERT_GPU_NOTES.md).
+- **Hilbert curve** option alongside Morton: a larger, separable effort — design
+  notes in [`HILBERT_GPU_NOTES.md`](HILBERT_GPU_NOTES.md).
 - **Codes > 256 bits**: just raise `MORTON_MAX_BITS`; revisit `wide_uint`
   performance (it is intentionally simple, not tuned) if that becomes a hot path.
 

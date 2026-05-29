@@ -60,6 +60,16 @@ Interleaves `Dim` coordinates of `Bits` bits each. `Dim*Bits <= 64` uses a built
 
 `detail::wide_uint<W>` is a minimal fixed-width (`W` × `u64`, little-endian) unsigned providing exactly the operators `Morton` uses (`+ - & | ^ ~ << >>`, comparisons, conversions to `u64`/`__int128`). `uint_for` selects it automatically when `Dim*Bits` exceeds the builtin width (64, or 128 with `__int128`). Cap is `MORTON_MAX_BITS` (default 256). The Morton class body is unchanged — it's all operators — so 192-bit (`Morton<3,64>`) and 256-bit (`Morton<2,128>`) "just work". Don't tune `wide_uint` for speed unless it becomes a hot path; it's deliberately simple.
 
+### `cuda/` — GPU backend (shares the core via `MORTON_HD`)
+
+The core's functions are prefixed with `MORTON_HD`, a macro that expands to `__host__ __device__` under `__CUDACC__`/`__HIPCC__` and to nothing for an ordinary host build (so the CPU library is byte-for-byte unchanged). This lets `cuda/include/morton_cuda/morton_cuda.cuh` kernels call the **same** `Morton<Dim,Bits>` code — no second implementation. Two gotchas baked into the core:
+- `deposit`/`extract` guard PDEP/PEXT with `#if defined(__BMI2__) && !defined(__CUDA_ARCH__)` — never emit the x86 intrinsic in device code, even when the host is compiled `-mbmi2`. Don't drop the `!defined(__CUDA_ARCH__)`.
+- `axis_mask(d)` computes the mask under `__CUDA_ARCH__` instead of reading the host `static constexpr axis_masks_` array (can't reference a host static from device).
+
+`morton::cuda` offers `*_device` (caller owns device pointers) and `*_host` (alloc+copy+launch+free) wrappers for encode/decode (2D/3D) and per-axis add. Tests (`cuda/tests/test_cuda.cu`) validate GPU output bit-for-bit against the CPU library; `cuda/bench/bench_cuda.cu` shows device-resident ~51 GMops/s vs PCIe-bound host round-trip.
+
+Build: standard CUDA install via `cuda/CMakeLists.txt` (CMake CUDA language, `-DCMAKE_CUDA_ARCHITECTURES=90`); or, without a full nvcc, `CUDA_PATH=... cuda/build_clang.sh` (clang as the CUDA compiler — what this repo's dev environment uses: pip CUDA wheels + redist `cuda_nvcc` for ptxas/fatbinary/nvlink, target sm_90 PTX which JITs onto the RTX 5080's sm_120). GPU CI needs a GPU runner.
+
 ### Octree → sibling `octree/` project
 
 The octree is **no longer part of this library**. It moved to `octree/` (`morton_octree::Octree`, `octree/include/morton_octree/octree.hpp`), a separate project that depends on `morton::morton`. See `octree/PLAN.md`. `legacy/octree.hpp` remains the original prototype/reference.

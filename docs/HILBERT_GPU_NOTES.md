@@ -44,6 +44,14 @@ the same O(1) neighbour step. **Recommendation:** ship Hilbert as encode/decode
 
 ## GPU / SYCL batch kernels
 
+> **Update: a CUDA backend is now implemented** in `cuda/` (`morton::cuda`),
+> following the design below: the core is `__host__ __device__` so kernels reuse
+> the CPU code path, encode/decode use the software bit path, and the host API is
+> array-shaped. Measured behaviour confirmed the prediction — device-resident
+> throughput is ~33× one CPU core, but one-shot host calls are PCIe-transfer-
+> bound. What remains from this section: the Z-order **radix sort**, the
+> device-array Python entry point, and SYCL/HIP portability.
+
 ### Why
 The bulk array ops in `batch.hpp` are embarrassingly parallel; large point sets
 (graphics, particle sims, databases) encode/sort/query millions of codes.

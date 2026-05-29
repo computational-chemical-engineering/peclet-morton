@@ -85,6 +85,16 @@ A linear **octree/quadtree** built on this library lives in the sibling
 [`octree/`](octree/) project (`morton_octree::Octree`) — it is being split into
 its own repository; see [octree/PLAN.md](octree/PLAN.md).
 
+### GPU (CUDA)
+
+A CUDA backend lives in [`cuda/`](cuda/). Because the core marks its functions
+`__host__ __device__`, the GPU kernels run the *same* `Morton<Dim,Bits>` code as
+the CPU — no separate implementation. On an RTX 5080, 2D-32 encode hits
+**~51,000 Mops/s** when data is resident on the GPU (~33× one CPU core); a
+one-shot call on host data is PCIe-transfer-bound and no faster than the CPU, so
+the GPU pays off only when codes live on-device across a pipeline. See
+[cuda/README.md](cuda/README.md).
+
 ## Build, test, benchmark
 
 ```bash
@@ -158,6 +168,7 @@ cmake/               CMake package-config template (find_package(morton))
 .github/workflows/   ci.yml (build matrix) + release.yml (PyPI wheels on tag)
 docs/                EVALUATION.md, ROADMAP.md, HILBERT_GPU_NOTES.md, Doxyfile
 octree/              sibling project: linear octree on this library (being split out)
+cuda/                CUDA backend (shares the core via __host__ __device__)
 legacy/              the original arbitrary-width BitArray + octree prototype
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```
