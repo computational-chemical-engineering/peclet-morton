@@ -1,0 +1,11 @@
+{
+  "name": "morton",
+  "version": "0.1.0",
+  "description": "Fast Morton (Z-order) codes with O(1) arithmetic in Morton space",
+  "homepage": "https://github.com/computational-chemical-engineering/morton_artithmetic",
+  "license": "MIT",
+  "dependencies": [
+    { "name": "vcpkg-cmake", "host": true },
+    { "name": "vcpkg-cmake-config", "host": true }
+  ]
+}

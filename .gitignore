@@ -1,4 +1,4 @@
-/build*/
+build*/
 *.o
 *.so
 *.dylib
@@ -6,3 +6,6 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# generated docs
+/docs/doxygen/

@@ -1,0 +1,58 @@
+# Root build configuration for the `mortonarith` Python wheel.
+#
+# Uses scikit-build-core: `pip install .` invokes CMake in MORTON_WHEEL mode,
+# which compiles the C-ABI extension (bindings/morton_c.cpp) and installs the
+# shared library into the `mortonarith` package. Because the whole repository
+# is the source tree, the build is self-contained (the C++ headers in include/
+# and bindings/ are available during an isolated build).
+
+[build-system]
+requires = ["scikit-build-core>=0.5", "numpy>=1.20"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mortonarith"
+version = "0.1.0"
+description = "Fast Morton (Z-order) codes with O(1) arithmetic, vectorised for NumPy"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Frank Peters" }]
+dependencies = ["numpy>=1.20"]
+
+[project.urls]
+Homepage = "https://github.com/computational-chemical-engineering/morton_artithmetic"
+
+[tool.scikit-build]
+minimum-version = "0.8"
+cmake.version = ">=3.16"
+cmake.args = ["-DMORTON_WHEEL=ON"]
+wheel.packages = ["bindings/python/mortonarith"]
+sdist.include = ["include", "bindings", "CMakeLists.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["bindings/python/tests"]
+
+# ---------------------------------------------------------------------------
+# Redistributable wheels (cibuildwheel). Built *without* -mbmi2 so they never
+# SIGILL on a CPU lacking BMI2, but with MORTON_ENABLE_RUNTIME_DISPATCH=ON so
+# the single portable binary still uses PDEP/PEXT (and the AVX-512 batch
+# kernels) at runtime when the executing CPU supports them, via per-function
+# `target` attributes + a CPUID check. This removes the old portability/speed
+# trade-off: one wheel is both safe on old CPUs and fast on new ones. (On
+# non-x86 / MSVC the dispatch self-disables and the software path is used.)
+# Source installs (`pip install .`) default to BMI2 ON and are fast directly.
+# ---------------------------------------------------------------------------
+[tool.cibuildwheel]
+build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_i686 *_i686 *-win32 pp*"
+build-frontend = "build"
+test-requires = ["pytest", "numpy"]
+test-command = "python -m pytest {project}/bindings/python/tests -q"
+
+[tool.cibuildwheel.environment]
+CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON"
+
+[tool.cibuildwheel.macos.environment]
+CMAKE_ARGS = "-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON"
+MACOSX_DEPLOYMENT_TARGET = "10.13"

@@ -56,20 +56,49 @@ operations, which libmorton and similar libraries do not provide.
 ## Design
 
 - **Header-only**, C++17, no dependencies. `#include "morton/morton.hpp"`.
-- `Morton<Dim, Bits>` interleaves `Dim` coordinates of `Bits` bits each
-  (`Dim * Bits ≤ 64`); the code is stored in the smallest unsigned integer that
-  fits.
+- `Morton<Dim, Bits>` interleaves `Dim` coordinates of `Bits` bits each; the code
+  is stored in the smallest unsigned integer that fits. `Dim * Bits ≤ 64` uses a
+  built-in integer; **65–128 bits use `__uint128_t`** where available, so 3D
+  32-bit (`Morton3D32`, 96-bit) and 2D 64-bit (`Morton2D64`, 128-bit) work too.
 - Encode/decode use **BMI2 `PDEP`/`PEXT`** when compiled with `-mbmi2`, with a
-  portable constexpr software fallback otherwise. Both paths are tested for
-  agreement.
-- Arithmetic wraps modulo `2^Bits` per axis (well-defined, branchless).
-- `morton/iterate.hpp` adds region traversal: `for_each_in_box` (row-major,
-  arithmetic) and `for_each_in_box_zorder` (Z-order, via the Tropf-Herzog
-  BIGMIN range-search algorithm).
+  portable software fallback otherwise. Both paths are tested for agreement.
+- **`constexpr`**: the software path runs at compile time (selected via
+  `__builtin_is_constant_evaluated()`), so you can build lookup tables in
+  `constexpr`.
+- Arithmetic wraps modulo `2^Bits` per axis (branchless); `add_sat`/`sub_sat`/
+  `try_add`/`try_sub` clamp or refuse instead of wrapping.
 
-Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`.
+### Headers
+
+| header | provides |
+|---|---|
+| `morton/morton.hpp` | `Morton<Dim,Bits>`: encode/decode, axis arithmetic, saturating ops, `face_neighbors`/`all_neighbors`, `ancestor`/`child` hierarchy, Z-order `++/--` |
+| `morton/iterate.hpp` | `for_each_in_box` (row-major), `for_each_in_box_zorder` (Z-order), and the Tropf-Herzog range-search pair `bigmin_in_box` / `litmax_in_box` |
+| `morton/batch.hpp` | vectorised bulk `add`/`sub`/`step`/`encode` over arrays (AVX2 auto-vectorised) |
+| `morton/wide_uint.hpp` | fixed-width word-array unsigned backing codes wider than 128 bits (pulled in automatically) |
+
+Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`,
+`Morton3D32`, `Morton2D64`. Codes wider than 128 bits (up to `MORTON_MAX_BITS`,
+default 256) work too, e.g. `Morton<3,64>` (192-bit), `Morton<2,128>` (256-bit).
+
+A linear **octree/quadtree** built on this library lives in the sibling
+[`octree/`](octree/) project (`morton_octree::Octree`) — it is being split into
+its own repository; see [octree/PLAN.md](octree/PLAN.md).
+
+### GPU (CUDA)
+
+A CUDA backend lives in [`cuda/`](cuda/). Because the core marks its functions
+`__host__ __device__`, the GPU kernels run the *same* `Morton<Dim,Bits>` code as
+the CPU — no separate implementation. On an RTX 5080, 2D-32 encode hits
+**~51,000 Mops/s** when data is resident on the GPU (~33× one CPU core); a
+one-shot call on host data is PCIe-transfer-bound and no faster than the CPU, so
+the GPU pays off only when codes live on-device across a pipeline. See
+[cuda/README.md](cuda/README.md).
 
 ## Build, test, benchmark
+
+Full per-platform setup (incl. Python wheels and the GPU build) is in
+[DEVELOPMENT.md](DEVELOPMENT.md). Quick start:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -78,10 +107,19 @@ ctest --test-dir build --output-on-failure   # or: ./build/tests/morton_tests
 ./build/benchmarks/morton_bench
 ```
 
-As a header-only dependency in another CMake project:
+As a header-only dependency in another CMake project — either vendored:
 
 ```cmake
 add_subdirectory(morton_arithmetic)
+target_link_libraries(your_target PRIVATE morton::morton)
+```
+
+…or installed and found via `find_package` (an `install` exports a CMake
+package config; Conan recipe in `conanfile.py`, vcpkg port in
+`packaging/vcpkg/morton/`):
+
+```cmake
+find_package(morton CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE morton::morton)
 ```
 
@@ -93,17 +131,26 @@ region iterators against brute force (>1M assertions).
 ## Python
 
 A vectorised NumPy interface (pure `ctypes`, no pybind11/native build deps
-beyond a C++ compiler) lives in `bindings/python`:
+beyond a C++ compiler). Install as a wheel with scikit-build-core:
 
 ```bash
-cmake --build build --target mortonarith_c        # builds the .so into the package
-PYTHONPATH=bindings/python python3 -c "
+pip install .            # builds the extension and bundles it into the wheel
+python -m pytest bindings/python/tests -q
+```
+
+```python
 import numpy as np, mortonarith as ma
 x = np.arange(1000, dtype=np.uint32); y = x * 2
 codes = ma.encode(x, y, bits=32)
 shifted = ma.shift(codes, axis=0, delta=+1, dims=2, bits=32)  # +1 in x, no decode
 print(ma.decode(shifted, dims=2, bits=32))
-"
+```
+
+For a quick dev loop without installing, drop the `.so` next to the package and
+use `PYTHONPATH`:
+
+```bash
+cmake --build build --target mortonarith_c
 PYTHONPATH=bindings/python python3 -m pytest bindings/python/tests -q
 ```
 
@@ -113,11 +160,18 @@ Every call runs over whole arrays in compiled code. The arithmetic `shift` is
 ## Repository layout
 
 ```
-include/morton/      the library (morton.hpp, iterate.hpp)
-tests/               doctest suite
-benchmarks/          C++ micro-benchmarks (vs libmorton)
+include/morton/      the library: morton.hpp, iterate.hpp, batch.hpp, wide_uint.hpp
+tests/               doctest suite (encode/decode, arithmetic, constexpr, wide,
+                     neighbours, batch, iterate)
+benchmarks/          C++ micro-benchmarks (vs libmorton) + batch/SIMD benchmark
 bindings/python/     ctypes + NumPy wrapper and pytest tests
-docs/                EVALUATION.md (vs prior art) and ROADMAP.md
+pyproject.toml       scikit-build-core wheel build + cibuildwheel config
+conanfile.py         Conan recipe;  packaging/vcpkg/  vcpkg port
+cmake/               CMake package-config template (find_package(morton))
+.github/workflows/   ci.yml (build matrix) + release.yml (PyPI wheels on tag)
+docs/                EVALUATION.md, ROADMAP.md, HILBERT_GPU_NOTES.md, Doxyfile
+octree/              sibling project: linear octree on this library (being split out)
+cuda/                CUDA backend (shares the core via __host__ __device__)
 legacy/              the original arbitrary-width BitArray + octree prototype
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```
