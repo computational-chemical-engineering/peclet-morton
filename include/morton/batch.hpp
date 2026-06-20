@@ -1,18 +1,17 @@
-// morton/batch.hpp
-//
-// Bulk array operations. The per-axis arithmetic is a short sequence of masked
-// integer ops with a loop-invariant mask and increment, so these loops
-// auto-vectorise (AVX2/AVX-512) under -O3: the compiler turns them into packed
-// vpor/vpaddq/vpand. This is what gives the Python bindings near-native
-// throughput, and what a SIMD-batch API would expose to C++ callers.
-//
-// For 64-bit codes on x86-64 (GCC/Clang) these functions additionally dispatch
-// at runtime to the hand-written AVX-512 kernels in morton/simd.hpp when the
-// running CPU has AVX-512F; otherwise they fall back to the auto-vectorised
-// scalar loop below. The dispatch is transparent: results are bit-for-bit
-// identical to the scalar path, and a single binary adapts to the host CPU.
-//
-// SPDX-License-Identifier: MIT
+/// @file batch.hpp
+/// @brief Bulk (array) encode/decode/arithmetic with auto-vectorised + AVX-512 runtime dispatch.
+///
+/// The per-axis arithmetic is a short sequence of masked integer ops with a loop-invariant mask and
+/// increment, so these loops auto-vectorise (AVX2/AVX-512) under `-O3`: the compiler turns them into
+/// packed `vpor`/`vpaddq`/`vpand`. This is what gives the Python bindings near-native throughput, and
+/// what a SIMD-batch API would expose to C++ callers.
+///
+/// For 64-bit codes on x86-64 (GCC/Clang) these functions additionally dispatch at runtime to the
+/// hand-written AVX-512 kernels in @ref simd.hpp when the running CPU has AVX-512F; otherwise they
+/// fall back to the auto-vectorised scalar loop below. The dispatch is transparent: results are
+/// bit-for-bit identical to the scalar path, and a single binary adapts to the host CPU.
+///
+/// SPDX-License-Identifier: MIT
 
 #ifndef MORTON_BATCH_HPP
 #define MORTON_BATCH_HPP

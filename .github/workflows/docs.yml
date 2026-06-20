@@ -1,0 +1,50 @@
+name: Documentation
+
+# Build the Doxygen API docs (header-only C++17 in include/morton/) and publish them to GitHub Pages.
+# The CI workflow (ci.yml) also builds the docs as a "must generate" check on every push/PR; THIS
+# workflow additionally DEPLOYS them to Pages on pushes to main. Requires Pages to be enabled for the
+# repository with "Source: GitHub Actions" (Settings -> Pages). Can also be triggered manually.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'include/**'
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Doxygen + Graphviz
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+      - name: Build documentation
+        run: doxygen docs/Doxyfile
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/doxygen/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

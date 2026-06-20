@@ -1,19 +1,15 @@
-// morton/iterate.hpp
-//
-// Region traversal built on the arithmetic core. Two strategies:
-//
-//   for_each_in_box        - row-major (lexicographic) order, advancing with
-//                            O(1) axis arithmetic so no cell is ever
-//                            re-encoded from scratch. This is the cheapest way
-//                            to sweep a dense axis-aligned region.
-//
-//   for_each_in_box_zorder - visits exactly the cells of the region but in
-//                            Z-order, using the Tropf-Herzog BIGMIN algorithm
-//                            to skip the gaps between rows. Useful when you
-//                            need results already sorted by Morton code (range
-//                            queries on a Z-ordered index).
-//
-// SPDX-License-Identifier: MIT
+/// @file iterate.hpp
+/// @brief Region traversal built on the arithmetic core (row-major and Z-order sweeps).
+///
+/// Two strategies:
+///
+/// - `for_each_in_box` — row-major (lexicographic) order, advancing with O(1) axis arithmetic so no
+///   cell is ever re-encoded from scratch. The cheapest way to sweep a dense axis-aligned region.
+/// - `for_each_in_box_zorder` — visits exactly the cells of the region but in Z-order, using the
+///   Tropf-Herzog BIGMIN algorithm to skip the gaps between rows. Useful when you need results
+///   already sorted by Morton code (range queries on a Z-ordered index).
+///
+/// SPDX-License-Identifier: MIT
 
 #ifndef MORTON_ITERATE_HPP
 #define MORTON_ITERATE_HPP

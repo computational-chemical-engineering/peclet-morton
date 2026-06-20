@@ -1,21 +1,20 @@
-// morton/morton.hpp
-//
-// A small, header-only C++17 library for Morton (Z-order) codes whose
-// distinguishing feature is *arithmetic directly in Morton space*: you can
-// increment, decrement, add to or step along a single axis, or find a
-// neighbour, in a handful of branchless instructions -- without decoding to
-// coordinates and re-encoding.
-//
-// Encoding/decoding uses the BMI2 PDEP/PEXT instructions when available
-// (-mbmi2, codes up to 64 bits) and a portable software implementation
-// otherwise. The software path is constexpr, so encode/decode/arithmetic can
-// run at compile time (e.g. to build lookup tables).
-//
-// Codes up to 64 bits are stored in a built-in unsigned integer; codes from 65
-// to 128 bits use __uint128_t where the compiler provides it (GCC/Clang), so
-// 3D 32-bit (96 bits) and 2D 64-bit (128 bits) work too.
-//
-// SPDX-License-Identifier: MIT
+/// @file morton.hpp
+/// @brief Core `Morton<Dim,Bits>` type — Z-order codes with O(1) arithmetic in Morton space.
+///
+/// A small, header-only C++17 library for Morton (Z-order) codes whose distinguishing feature is
+/// *arithmetic directly in Morton space*: you can increment, decrement, add to or step along a single
+/// axis, or find a neighbour, in a handful of branchless instructions — without decoding to
+/// coordinates and re-encoding.
+///
+/// Encoding/decoding uses the BMI2 PDEP/PEXT instructions when available (`-mbmi2`, codes up to 64
+/// bits) and a portable software implementation otherwise. The software path is `constexpr`, so
+/// encode/decode/arithmetic can run at compile time (e.g. to build lookup tables).
+///
+/// Codes up to 64 bits are stored in a built-in unsigned integer; codes from 65 to 128 bits use
+/// `__uint128_t` where the compiler provides it (GCC/Clang), so 3D 32-bit (96 bits) and 2D 64-bit
+/// (128 bits) work too. Wider codes use @ref wide_uint.hpp.
+///
+/// SPDX-License-Identifier: MIT
 
 #ifndef MORTON_MORTON_HPP
 #define MORTON_MORTON_HPP

@@ -1,12 +1,13 @@
-// morton/wide_uint.hpp
-//
-// A minimal fixed-width unsigned integer (W 64-bit words, little-endian) that
-// provides exactly the operators Morton<Dim,Bits> uses: + - & | ^ ~ << >> and
-// comparisons. This lets the same Morton implementation work for codes wider
-// than 128 bits, where no built-in integer exists. It is intentionally small
-// and constexpr; it is not a general bignum.
-//
-// SPDX-License-Identifier: MIT
+/// @file wide_uint.hpp
+/// @brief Minimal fixed-width unsigned integer backing Morton codes wider than 128 bits.
+///
+/// `detail::wide_uint<W>` is `W` 64-bit words (little-endian) providing exactly the operators
+/// `Morton<Dim,Bits>` uses: `+ - & | ^ ~ << >>` and comparisons. This lets the same Morton
+/// implementation work for codes wider than 128 bits, where no built-in integer exists. It is
+/// intentionally small and `constexpr`; it is **not** a general bignum and should not be tuned for
+/// speed unless it becomes a hot path.
+///
+/// SPDX-License-Identifier: MIT
 
 #ifndef MORTON_WIDE_UINT_HPP
 #define MORTON_WIDE_UINT_HPP
@@ -19,10 +20,12 @@
 namespace morton {
 namespace detail {
 
+/// Fixed-width unsigned integer of @tparam W 64-bit words, little-endian (`w[0]` least significant).
+/// Selected automatically by `uint_for` when `Dim*Bits` exceeds the largest built-in integer.
 template <std::size_t W>
 struct wide_uint {
     static_assert(W >= 2, "use a built-in integer for <= 64 bits");
-    std::array<std::uint64_t, W> w{};  // w[0] is least significant
+    std::array<std::uint64_t, W> w{};  ///< Words, little-endian: w[0] is least significant.
 
     constexpr wide_uint() = default;
 

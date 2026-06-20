@@ -1,18 +1,16 @@
-// morton/simd.hpp
-//
-// Explicit AVX-512 batch kernels for the bulk encode/decode/arithmetic paths.
-// Unlike the auto-vectorised loops in batch.hpp, these are hand-written with
-// AVX-512 intrinsics ("magic-bits" bit spreading, libmorton-style) and process
-// eight 64-bit codes per iteration.
-//
-// They are compiled with a per-function `__attribute__((target("avx512f")))`,
-// so the translation unit does *not* need -mavx512f and the rest of the binary
-// stays portable. batch.hpp dispatches to them at runtime only when
-// detail::cpu_has_avx512f() is true, so a single binary uses AVX-512 on a
-// capable CPU and the scalar/AVX2 path elsewhere. Codes that are not 64 bits
-// wide keep the scalar path.
-//
-// SPDX-License-Identifier: MIT
+/// @file simd.hpp
+/// @brief Explicit AVX-512 batch kernels for the bulk encode/decode/arithmetic paths.
+///
+/// Unlike the auto-vectorised loops in @ref batch.hpp, these are hand-written with AVX-512 intrinsics
+/// ("magic-bits" bit spreading, libmorton-style) and process eight 64-bit codes per iteration.
+///
+/// They are compiled with a per-function `__attribute__((target("avx512f")))`, so the translation
+/// unit does *not* need `-mavx512f` and the rest of the binary stays portable. `batch.hpp` dispatches
+/// to them at runtime only when `detail::cpu_has_avx512f()` is true, so a single binary uses AVX-512
+/// on a capable CPU and the scalar/AVX2 path elsewhere. Codes that are not 64 bits wide keep the
+/// scalar path. Validate changes under Intel SDE (`sde64 -skx`) — most dev/CI hosts lack AVX-512.
+///
+/// SPDX-License-Identifier: MIT
 
 #ifndef MORTON_SIMD_HPP
 #define MORTON_SIMD_HPP

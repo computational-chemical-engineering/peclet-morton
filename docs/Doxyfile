@@ -11,7 +11,8 @@ CREATE_SUBDIRS         = NO
 FULL_PATH_NAMES        = NO
 
 # Inputs ---------------------------------------------------------------------
-INPUT                  = include README.md docs/EVALUATION.md docs/ROADMAP.md
+INPUT                  = include README.md DEVELOPMENT.md \
+                         docs/EVALUATION.md docs/ROADMAP.md docs/HILBERT_GPU_NOTES.md
 FILE_PATTERNS          = *.hpp
 RECURSIVE              = YES
 USE_MDFILE_AS_MAINPAGE = README.md
