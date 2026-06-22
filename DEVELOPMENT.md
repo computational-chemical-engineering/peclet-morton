@@ -11,7 +11,7 @@ specific to one workstation; ISA features are detected at configure time.
 | C++ core: build + test + benchmark | CMake ≥ 3.16, a C++17 compiler (GCC ≥ 9, Clang ≥ 9, or MSVC 2019+) |
 | Python bindings / wheel | Python ≥ 3.8, `pip`; build pulls `scikit-build-core` + `numpy` |
 | API docs | Doxygen |
-| GPU (CUDA) backend | an NVIDIA GPU + a CUDA toolkit (see below) |
+| GPU (Kokkos) backend | a Kokkos install (CUDA / HIP / OpenMP) on `CMAKE_PREFIX_PATH` (see below) |
 
 The core is **header-only and dependency-free**; `third_party/` vendors doctest
 and libmorton for tests/benchmarks only.
@@ -123,76 +123,44 @@ target_link_libraries(app PRIVATE morton::morton)
 
 Conan recipe: `conanfile.py`. vcpkg port: `packaging/vcpkg/morton/`.
 
-## GPU (CUDA) backend — `cuda/`
+## GPU (Kokkos) backend — `include/morton/kokkos.hpp`
 
-Only needed if the machine has an NVIDIA GPU. The kernels reuse the core code
-path (`__host__ __device__`), so there is nothing GPU-specific to maintain in
-the math.
+The portable Kokkos backend (`morton::kokkos`) reuses the core code path
+(`MORTON_HD` → `KOKKOS_FUNCTION`), so there is nothing GPU-specific to maintain
+in the math, and it runs on **any** Kokkos backend — CUDA, HIP, OpenMP or
+Serial. The backend and target architecture come from the Kokkos build it is
+linked against, not from this repo. (This replaces the retired raw-CUDA backend;
+the last raw-CUDA tree is preserved under the `pre-cuda-retirement` git tag.)
 
-### Preferred: a normal CUDA Toolkit (`nvcc`)
-
-Install the CUDA Toolkit (≥ 12.8 for Blackwell / sm_120; otherwise match your
-GPU). Then:
-
-```bash
-cmake -S cuda -B cuda/build -DCMAKE_CUDA_ARCHITECTURES=90
-cmake --build cuda/build -j
-ctest --test-dir cuda/build --output-on-failure
-./cuda/build/morton_cuda_bench
-```
-
-`CMAKE_CUDA_ARCHITECTURES=90` builds Hopper PTX, which the driver JITs onto
-newer cards (e.g. sm_120 / RTX 50-series). Set it to your GPU's native arch for
-a cubin (e.g. `120` with CUDA ≥ 12.8) to skip JIT.
-
-### Fallback: clang as the CUDA compiler
-
-Use this when you don't have a full `nvcc` (e.g. only the pip redistributable
-pieces) or hit an `nvcc` vs. system-glibc header clash (the `cospi/sinpi`
-"exception specification" errors with very new glibc + older CUDA). clang does
-the CUDA front-end itself and needs only `ptxas` + `fatbinary` + `nvlink` +
-`libdevice` + headers + `cudart`, arranged in a toolkit-shaped directory.
-
-Assembling that directory from pip wheels + the NVIDIA redistributable archive:
+Kokkos is consumed the same way as the rest of the `peclet` suite:
+`find_package(Kokkos CONFIG)` against a prefix on `CMAKE_PREFIX_PATH`, provided
+either by a cluster module (`module load Kokkos`) or by the suite bootstrap:
 
 ```bash
-python -m venv /tmp/cudaenv && /tmp/cudaenv/bin/pip install -U pip
-/tmp/cudaenv/bin/pip install \
-  nvidia-cuda-nvcc-cu12 nvidia-cuda-runtime-cu12 nvidia-curand-cu12 nvidia-cuda-cccl-cu12
-NV=/tmp/cudaenv/lib/python*/site-packages/nvidia
+# one-time, from the suite root: build Kokkos for the backend you want
+../tools/bootstrap_deps.sh host-openmp        # or nvidia-cuda / lumi-hip
 
-# the nvcc pip wheel ships only ptxas; get nvcc/fatbinary/nvlink/cicc from the
-# matching redistributable archive (version must match the nvcc wheel):
-curl -sSL -o /tmp/nvcc.tar.xz \
-  https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvcc/linux-x86_64/cuda_nvcc-linux-x86_64-12.9.86-archive.tar.xz
-mkdir -p /tmp/nvcc_pkg && tar -xJf /tmp/nvcc.tar.xz -C /tmp/nvcc_pkg --strip-components=1
-
-# build a CUDA_PATH that clang understands
-mkdir -p /tmp/cuda/bin /tmp/cuda/nvvm/libdevice /tmp/cuda/include /tmp/cuda/lib64
-ln -sf /tmp/nvcc_pkg/bin/{ptxas,fatbinary,nvlink,cicc} /tmp/cuda/bin/
-ln -sf $NV/cuda_nvcc/nvvm/libdevice/libdevice.10.bc /tmp/cuda/nvvm/libdevice/
-cp -rs $NV/cuda_runtime/include/* $NV/cuda_nvcc/include/* $NV/curand/include/* \
-       $NV/cuda_cccl/include/* /tmp/cuda/include/ 2>/dev/null
-ln -sf $NV/cuda_runtime/lib/libcudart.so.12 /tmp/cuda/lib64/libcudart.so
-ln -sf $NV/cuda_runtime/lib/libcudart.so.12 /tmp/cuda/lib64/libcudart.so.12
-
-# build + run (sm_90 PTX JITs onto newer GPUs)
-CUDA_PATH=/tmp/cuda GPU_ARCH=sm_90 ./cuda/build_clang.sh
+# enable the morton Kokkos backend, point it at that prefix
+cmake -S . -B build_kokkos -DMORTON_ENABLE_KOKKOS=ON \
+      -DCMAKE_PREFIX_PATH="$PWD/../extern/install/host-openmp"
+cmake --build build_kokkos -j
+ctest --test-dir build_kokkos --output-on-failure   # morton_kokkos_tests
+./build_kokkos/benchmarks/morton_bench_kokkos
 ```
 
-`cuda/build_clang.sh` compiles and runs the tests and benchmark; it only needs
-`CUDA_PATH` (and optionally `GPU_ARCH`, `CXX`). Run binaries with
-`LD_LIBRARY_PATH=$CUDA_PATH/lib64`.
+For the CUDA backend, point `CMAKE_PREFIX_PATH` at `extern/install/nvidia-cuda`
+and put `nvcc` on `PATH` (e.g. `export PATH=/usr/local/cuda-13.2/bin:$PATH`);
+Kokkos routes the device sources through the launch compiler automatically — the
+sources stay plain `.cpp`. The test cross-checks every device result against the
+scalar `Morton<>` reference bit-for-bit on all four binding layouts
+(`(2,32) (2,16) (3,21) (3,16)`).
 
-> The exact `cuda_nvcc` archive name (`...-12.9.86-...`) must match the installed
-> `nvidia-cuda-nvcc-cu12` version; list options in
-> `https://developer.download.nvidia.com/compute/cuda/redist/redistrib_<ver>.json`.
-
-GPU CI needs a GPU runner (self-hosted), so the CUDA backend is not part of the
-default GitHub Actions matrix.
+GPU CI needs a GPU runner (self-hosted), so the CUDA/HIP backends are not part of
+the default GitHub Actions matrix (the OpenMP backend is exercisable anywhere).
 
 ## Repository map
 
 See the "Repository layout" section of [README.md](README.md). In short:
-`include/morton/` is the library; `tests/`, `benchmarks/`, `bindings/python/`,
-`cuda/`, `octree/` (sibling project), `docs/`, `packaging/`, `legacy/`.
+`include/morton/` is the library (incl. the `kokkos.hpp` GPU backend); `tests/`
+(with `tests/kokkos/`), `benchmarks/`, `bindings/python/`, `octree/` (sibling
+project), `docs/`, `packaging/`, `legacy/`.

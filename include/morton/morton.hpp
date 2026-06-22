@@ -70,9 +70,18 @@
 #define MORTON_MAX_BITS 256
 #endif
 
-// Mark functions callable from CUDA/HIP device code. Expands to nothing for an
-// ordinary host C++ build, so the CPU library is completely unchanged.
-#if defined(__CUDACC__) || defined(__HIPCC__)
+// Mark functions callable from device code. Expands to nothing for an ordinary
+// host C++ build, so the CPU library is completely unchanged.
+//
+// When the morton Kokkos backend is enabled and Kokkos is in the translation
+// unit, defer to Kokkos's own function marker: KOKKOS_FUNCTION resolves to the
+// right host/device attributes for whichever backend (CUDA / HIP / OpenMP /
+// Serial) Kokkos was built with -- so the same Morton<Dim,Bits> code is callable
+// from a Kokkos kernel on any backend. The raw __CUDACC__/__HIPCC__ branch
+// remains the fallback for a direct nvcc/hipcc compile without Kokkos.
+#if defined(MORTON_ENABLE_KOKKOS) && defined(KOKKOS_VERSION)
+#define MORTON_HD KOKKOS_FUNCTION
+#elif defined(__CUDACC__) || defined(__HIPCC__)
 #define MORTON_HD __host__ __device__
 #else
 #define MORTON_HD

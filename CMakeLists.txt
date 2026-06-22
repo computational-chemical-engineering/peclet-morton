@@ -33,6 +33,20 @@ if(MORTON_ENABLE_RUNTIME_DISPATCH)
     target_compile_definitions(morton INTERFACE MORTON_ENABLE_RUNTIME_DISPATCH=1)
 endif()
 
+# Portable Kokkos backend (include/morton/kokkos.hpp). Opt-in: the plain build
+# (and the wheels) never touch Kokkos and stay bit-identical. When ON, Kokkos is
+# found via find_package(CONFIG) against the suite's bootstrapped install prefix
+# (extern/install/<backend>, from tools/bootstrap_deps.sh) or a cluster module --
+# the same single mechanism the rest of the suite uses. The backend (CUDA / HIP /
+# OpenMP / Serial) and architecture come from that Kokkos build, not from here.
+option(MORTON_ENABLE_KOKKOS "Build the portable Kokkos backend (and its tests/bench)" OFF)
+if(MORTON_ENABLE_KOKKOS)
+    find_package(Kokkos CONFIG REQUIRED)
+    message(STATUS "morton: Kokkos ${Kokkos_VERSION} (backends: ${Kokkos_DEVICES})")
+    target_compile_definitions(morton INTERFACE MORTON_ENABLE_KOKKOS=1)
+    target_link_libraries(morton INTERFACE Kokkos::kokkos)
+endif()
+
 # Wheel mode (driven by scikit-build-core via the root pyproject.toml): build
 # only the Python extension and install it into the package directory.
 option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)
@@ -57,6 +71,9 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     if(MORTON_BUILD_TESTS)
         enable_testing()
         add_subdirectory(tests)
+        if(MORTON_ENABLE_KOKKOS)
+            add_subdirectory(tests/kokkos)
+        endif()
     endif()
     if(MORTON_BUILD_BENCHMARKS)
         add_subdirectory(benchmarks)

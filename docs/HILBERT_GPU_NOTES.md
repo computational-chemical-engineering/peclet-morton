@@ -44,8 +44,10 @@ the same O(1) neighbour step. **Recommendation:** ship Hilbert as encode/decode
 
 ## GPU / SYCL batch kernels
 
-> **Update: a CUDA backend is now implemented** in `cuda/` (`morton::cuda`),
-> following the design below: the core is `__host__ __device__` so kernels reuse
+> **Update: a portable Kokkos backend is now implemented** in
+> `include/morton/kokkos.hpp` (`morton::kokkos`; it superseded the original
+> raw-CUDA backend, retired at the `pre-cuda-retirement` tag), runs on CUDA / HIP
+> / OpenMP, and follows the design below: the core is device-callable so kernels reuse
 > the CPU code path, encode/decode use the software bit path, and the host API is
 > array-shaped. Measured behaviour confirmed the prediction — device-resident
 > throughput is ~33× one CPU core, but one-shot host calls are PCIe-transfer-

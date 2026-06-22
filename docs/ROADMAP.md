@@ -60,12 +60,14 @@ are listed in "Done since v0.2" further down:
   (`morton_octree::Octree`), which depends on this library. 2:1 balancing,
   cross-level neighbour queries and bulk construction are tracked in
   [`../octree/PLAN.md`](../octree/PLAN.md), not here.
-- ✅ **GPU (CUDA) backend** — `cuda/` (`morton::cuda`). The core is marked
-  `__host__ __device__` (`MORTON_HD`), so kernels reuse the exact CPU code path
-  (PDEP guarded out of device code). encode/decode (2D/3D) + per-axis arithmetic;
-  validated bit-for-bit against the CPU library on the GPU. ~51 GMops/s
-  device-resident 2D-32 encode on an RTX 5080 (~33× one CPU core); one-shot host
-  calls are PCIe-bound (documented).
+- ✅ **Portable GPU backend (Kokkos)** — `include/morton/kokkos.hpp`
+  (`morton::kokkos`). Runs on any Kokkos backend (CUDA / HIP / OpenMP / Serial).
+  The core's `MORTON_HD` resolves to `KOKKOS_FUNCTION`, so kernels reuse the exact
+  CPU code path (PDEP guarded out of device code). `Kokkos::View` encode/decode
+  (2D/3D) + per-axis arithmetic; validated bit-for-bit against the scalar library
+  on the GPU. ~51 GMops/s device-resident 2D-32 encode on an RTX 5080 (~33× one
+  CPU core); one-shot host calls are PCIe-bound (documented). Replaced the
+  original raw-CUDA backend (`cuda/`, retired — `pre-cuda-retirement` git tag).
 
 ## Done since v0.3
 

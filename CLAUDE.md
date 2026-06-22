@@ -35,6 +35,12 @@ sde64 -snb -- ./build_rt/tests/morton_tests   # no BMI2/AVX-512 -> software fall
 sde64 -hsw -- ./build_rt/tests/morton_tests   # BMI2, no AVX-512 -> PDEP path
 sde64 -skx -- ./build_rt/tests/morton_tests   # BMI2 + AVX-512
 
+# portable Kokkos GPU backend (opt-in; needs a Kokkos prefix on CMAKE_PREFIX_PATH
+# from ../tools/bootstrap_deps.sh <nvidia-cuda|host-openmp|lumi-hip>):
+cmake -S . -B build_kokkos -DMORTON_ENABLE_KOKKOS=ON \
+      -DCMAKE_PREFIX_PATH="$PWD/../extern/install/host-openmp" && cmake --build build_kokkos -j
+ctest --test-dir build_kokkos -R morton_kokkos_tests --output-on-failure
+
 # Python: proper wheel via scikit-build-core (pip install . from repo root)
 pip install .                                     # builds extension, bundles .so
 python -m pytest bindings/python/tests -q
@@ -79,15 +85,15 @@ Hand-written AVX-512 "magic-bits" spread/compact (`detail::avx512::{encode2,deco
 
 `detail::wide_uint<W>` is a minimal fixed-width (`W` × `u64`, little-endian) unsigned providing exactly the operators `Morton` uses (`+ - & | ^ ~ << >>`, comparisons, conversions to `u64`/`__int128`). `uint_for` selects it automatically when `Dim*Bits` exceeds the builtin width (64, or 128 with `__int128`). Cap is `MORTON_MAX_BITS` (default 256). The Morton class body is unchanged — it's all operators — so 192-bit (`Morton<3,64>`) and 256-bit (`Morton<2,128>`) "just work". Don't tune `wide_uint` for speed unless it becomes a hot path; it's deliberately simple.
 
-### `cuda/` — GPU backend (shares the core via `MORTON_HD`)
+### `include/morton/kokkos.hpp` — portable Kokkos GPU backend (shares the core via `MORTON_HD`)
 
-The core's functions are prefixed with `MORTON_HD`, a macro that expands to `__host__ __device__` under `__CUDACC__`/`__HIPCC__` and to nothing for an ordinary host build (so the CPU library is byte-for-byte unchanged). This lets `cuda/include/morton_cuda/morton_cuda.cuh` kernels call the **same** `Morton<Dim,Bits>` code — no second implementation. Two gotchas baked into the core:
+The core's functions are prefixed with `MORTON_HD`. It now resolves to **`KOKKOS_FUNCTION`** when `MORTON_ENABLE_KOKKOS` is set and Kokkos is in the translation unit (so device/host attributes track whichever Kokkos backend — CUDA/HIP/OpenMP/Serial — is active), and falls back to `__host__ __device__` under `__CUDACC__`/`__HIPCC__`, and to nothing for an ordinary host build (so the CPU library is byte-for-byte unchanged). This lets the Kokkos kernels call the **same** `Morton<Dim,Bits>` code — no second implementation. Two gotchas baked into the core (still required under the Kokkos CUDA/HIP device pass):
 - `deposit`/`extract` guard PDEP/PEXT with `#if defined(__BMI2__) && !defined(__CUDA_ARCH__)` — never emit the x86 intrinsic in device code, even when the host is compiled `-mbmi2`. Don't drop the `!defined(__CUDA_ARCH__)`.
 - `axis_mask(d)` computes the mask under `__CUDA_ARCH__` instead of reading the host `static constexpr axis_masks_` array (can't reference a host static from device).
 
-`morton::cuda` offers `*_device` (caller owns device pointers) and `*_host` (alloc+copy+launch+free) wrappers for encode/decode (2D/3D) and per-axis add. Tests (`cuda/tests/test_cuda.cu`) validate GPU output bit-for-bit against the CPU library; `cuda/bench/bench_cuda.cu` shows device-resident ~51 GMops/s vs PCIe-bound host round-trip.
+`morton::kokkos` offers `Kokkos::View`-based bulk ops — `encode2/3`, `decode2/3`, per-axis `add`/`sub`/`step` (execution space deduced from the View) — plus `*_host` raw-pointer convenience wrappers (stage to device Views, run, copy back). `tests/kokkos/test_kokkos.cpp` validates device output bit-for-bit against the scalar `Morton<>` reference for all four binding layouts `(2,32) (2,16) (3,21) (3,16)`; `benchmarks/bench_kokkos.cpp` shows device-resident ~51 GMops/s (CUDA) vs PCIe-bound host round-trip.
 
-Build: standard CUDA install via `cuda/CMakeLists.txt` (CMake CUDA language, `-DCMAKE_CUDA_ARCHITECTURES=90`); or, without a full nvcc, `CUDA_PATH=... cuda/build_clang.sh` (clang as the CUDA compiler — what this repo's dev environment uses: pip CUDA wheels + redist `cuda_nvcc` for ptxas/fatbinary/nvlink, target sm_90 PTX which JITs onto the RTX 5080's sm_120). GPU CI needs a GPU runner.
+Build: opt-in with `-DMORTON_ENABLE_KOKKOS=ON` + `find_package(Kokkos CONFIG)` against the suite's bootstrapped prefix (`extern/install/<backend>` from `tools/bootstrap_deps.sh`) on `CMAKE_PREFIX_PATH`, exactly like `sdflow`/`dem`. Device sources stay plain `.cpp` — Kokkos 5.x routes them through the launch compiler (see `../cmake/SuiteKokkos.cmake`). The plain (non-Kokkos) build never touches Kokkos and is unchanged. **The raw-CUDA backend was retired** (was `cuda/`, `morton::cuda`); the last raw-CUDA tree is at the `pre-cuda-retirement` git tag.
 
 ### Octree → sibling `octree/` project
 
