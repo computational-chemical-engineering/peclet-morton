@@ -55,7 +55,8 @@ A single doctest case can be run with `./build/tests/morton_tests --test-case="<
 
 ## Architecture (new core)
 
-Header dependency order: `morton.hpp` ← {`iterate.hpp`, `simd.hpp` ← `batch.hpp`, `octree.hpp`}.
+Header dependency order: `morton.hpp` ← {`iterate.hpp`, `simd.hpp` ← `batch.hpp`}. (The octree was split
+out into the sibling `octree/` subproject — see below — and is no longer a core header.)
 
 ### `morton/morton.hpp` — `Morton<unsigned Dim, unsigned Bits>`
 

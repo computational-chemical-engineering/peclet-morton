@@ -34,9 +34,9 @@ are listed in "Done since v0.2" further down:
 - ✅ **(8) Neighbour-set + hierarchy helpers** — `face_neighbors()` (von
   Neumann), `all_neighbors()` (Moore, `3^Dim-1`), `ancestor`/`child`/
   `child_index`.
-- ✅ **(9) Octree on the new core** — `morton/octree.hpp`: a linear octree/
-  quadtree (`std::map` keyed by Morton origin) with point location, face
-  neighbours and refinement expressed via the core arithmetic.
+- ✅ **(9) Octree on the new core** — `octree/include/morton_octree/octree.hpp` (split out into the
+  sibling `octree/` subproject): a linear octree/quadtree (`std::map` keyed by Morton origin) with point
+  location, face neighbours and refinement expressed via the core arithmetic.
 - ✅ **(10) SIMD batch arithmetic** — `morton/batch.hpp` (`add`/`sub`/`step`/
   `encode2`/`encode3`) auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`). Profiling
   (`benchmarks/bench_batch.cpp`) confirms ~1.7× over scalar when cache-resident
