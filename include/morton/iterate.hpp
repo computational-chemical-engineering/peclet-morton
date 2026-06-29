@@ -61,7 +61,7 @@ namespace detail {
 // box. See H. Tropf & H. Herzog, "Multidimensional Range Search in
 // Dynamically Balanced Trees" (1981).
 template <unsigned Dim, unsigned Bits>
-typename Morton<Dim, Bits>::code_type bigmin(
+MORTON_HD typename Morton<Dim, Bits>::code_type bigmin(
     typename Morton<Dim, Bits>::code_type zmin,
     typename Morton<Dim, Bits>::code_type zmax,
     typename Morton<Dim, Bits>::code_type z) {
@@ -104,7 +104,7 @@ typename Morton<Dim, Bits>::code_type bigmin(
 // corner; callers that have already established z is outside the box on the
 // relevant side get the meaningful answer.)
 template <unsigned Dim, unsigned Bits>
-void litmax_bigmin(typename Morton<Dim, Bits>::code_type zmin,
+MORTON_HD void litmax_bigmin(typename Morton<Dim, Bits>::code_type zmin,
                    typename Morton<Dim, Bits>::code_type zmax,
                    typename Morton<Dim, Bits>::code_type z,
                    typename Morton<Dim, Bits>::code_type& litmax,
@@ -184,7 +184,7 @@ bool litmax_in_box(const std::array<typename Morton<Dim, Bits>::coord_type, Dim>
 
 /// Test whether `m` lies inside the inclusive box [lo, hi].
 template <unsigned Dim, unsigned Bits>
-bool in_box(const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& lo,
+MORTON_HD bool in_box(const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& lo,
             const std::array<typename Morton<Dim, Bits>::coord_type, Dim>& hi,
             Morton<Dim, Bits> m) {
     for (unsigned d = 0; d < Dim; ++d) {

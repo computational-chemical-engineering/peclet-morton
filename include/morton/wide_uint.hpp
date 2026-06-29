@@ -17,6 +17,8 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "morton/hd.hpp"
+
 namespace morton {
 namespace detail {
 
@@ -27,18 +29,18 @@ struct wide_uint {
     static_assert(W >= 2, "use a built-in integer for <= 64 bits");
     std::array<std::uint64_t, W> w{};  ///< Words, little-endian: w[0] is least significant.
 
-    constexpr wide_uint() = default;
+    MORTON_HD constexpr wide_uint() = default;
 
     // From any built-in integral value up to 64 bits (low word).
     template <typename T,
               typename = std::enable_if_t<std::is_integral_v<T> && (sizeof(T) <= 8)>>
-    constexpr wide_uint(T v) : w{} {
+    MORTON_HD constexpr wide_uint(T v) : w{} {
         w[0] = std::uint64_t(static_cast<std::make_unsigned_t<T>>(v));
     }
 
 #if defined(__SIZEOF_INT128__)
     // From a 128-bit built-in (fills the low two words).
-    constexpr wide_uint(unsigned __int128 v) : w{} {
+    MORTON_HD constexpr wide_uint(unsigned __int128 v) : w{} {
         w[0] = std::uint64_t(v);
         if constexpr (W >= 2) w[1] = std::uint64_t(v >> 64);
     }
@@ -46,48 +48,48 @@ struct wide_uint {
 
     // From a wide_uint of a different width (truncate or zero-extend).
     template <std::size_t W2, typename = std::enable_if_t<W2 != W>>
-    constexpr explicit wide_uint(const wide_uint<W2>& o) : w{} {
+    MORTON_HD constexpr explicit wide_uint(const wide_uint<W2>& o) : w{} {
         for (std::size_t i = 0; i < W && i < W2; ++i) w[i] = o.w[i];
     }
 
-    explicit constexpr operator std::uint64_t() const { return w[0]; }
+    MORTON_HD explicit constexpr operator std::uint64_t() const { return w[0]; }
 #if defined(__SIZEOF_INT128__)
-    explicit constexpr operator unsigned __int128() const {
+    MORTON_HD explicit constexpr operator unsigned __int128() const {
         unsigned __int128 r = w[0];
         if constexpr (W >= 2) r |= (unsigned __int128)(w[1]) << 64;
         return r;
     }
 #endif
-    explicit constexpr operator bool() const {
+    MORTON_HD explicit constexpr operator bool() const {
         for (std::size_t i = 0; i < W; ++i)
             if (w[i]) return true;
         return false;
     }
 
     // ---- bitwise ----------------------------------------------------------
-    constexpr wide_uint operator~() const {
+    MORTON_HD constexpr wide_uint operator~() const {
         wide_uint r;
         for (std::size_t i = 0; i < W; ++i) r.w[i] = ~w[i];
         return r;
     }
-    constexpr wide_uint& operator&=(const wide_uint& o) {
+    MORTON_HD constexpr wide_uint& operator&=(const wide_uint& o) {
         for (std::size_t i = 0; i < W; ++i) w[i] &= o.w[i];
         return *this;
     }
-    constexpr wide_uint& operator|=(const wide_uint& o) {
+    MORTON_HD constexpr wide_uint& operator|=(const wide_uint& o) {
         for (std::size_t i = 0; i < W; ++i) w[i] |= o.w[i];
         return *this;
     }
-    constexpr wide_uint& operator^=(const wide_uint& o) {
+    MORTON_HD constexpr wide_uint& operator^=(const wide_uint& o) {
         for (std::size_t i = 0; i < W; ++i) w[i] ^= o.w[i];
         return *this;
     }
-    friend constexpr wide_uint operator&(wide_uint a, const wide_uint& b) { return a &= b; }
-    friend constexpr wide_uint operator|(wide_uint a, const wide_uint& b) { return a |= b; }
-    friend constexpr wide_uint operator^(wide_uint a, const wide_uint& b) { return a ^= b; }
+    friend MORTON_HD constexpr wide_uint operator&(wide_uint a, const wide_uint& b) { return a &= b; }
+    friend MORTON_HD constexpr wide_uint operator|(wide_uint a, const wide_uint& b) { return a |= b; }
+    friend MORTON_HD constexpr wide_uint operator^(wide_uint a, const wide_uint& b) { return a ^= b; }
 
     // ---- shifts -----------------------------------------------------------
-    constexpr wide_uint operator<<(unsigned s) const {
+    MORTON_HD constexpr wide_uint operator<<(unsigned s) const {
         wide_uint r;
         const unsigned ws = s / 64, bs = s % 64;
         for (int i = int(W) - 1; i >= 0; --i) {
@@ -101,7 +103,7 @@ struct wide_uint {
         }
         return r;
     }
-    constexpr wide_uint operator>>(unsigned s) const {
+    MORTON_HD constexpr wide_uint operator>>(unsigned s) const {
         wide_uint r;
         const unsigned ws = s / 64, bs = s % 64;
         for (std::size_t i = 0; i < W; ++i) {
@@ -115,11 +117,11 @@ struct wide_uint {
         }
         return r;
     }
-    constexpr wide_uint& operator<<=(unsigned s) { return *this = (*this << s); }
-    constexpr wide_uint& operator>>=(unsigned s) { return *this = (*this >> s); }
+    MORTON_HD constexpr wide_uint& operator<<=(unsigned s) { return *this = (*this << s); }
+    MORTON_HD constexpr wide_uint& operator>>=(unsigned s) { return *this = (*this >> s); }
 
     // ---- add / sub (ripple) -----------------------------------------------
-    friend constexpr wide_uint operator+(const wide_uint& a, const wide_uint& b) {
+    friend MORTON_HD constexpr wide_uint operator+(const wide_uint& a, const wide_uint& b) {
         wide_uint r;
         std::uint64_t carry = 0;
         for (std::size_t i = 0; i < W; ++i) {
@@ -132,7 +134,7 @@ struct wide_uint {
         }
         return r;
     }
-    friend constexpr wide_uint operator-(const wide_uint& a, const wide_uint& b) {
+    friend MORTON_HD constexpr wide_uint operator-(const wide_uint& a, const wide_uint& b) {
         wide_uint r;
         std::uint64_t borrow = 0;
         for (std::size_t i = 0; i < W; ++i) {
@@ -145,25 +147,25 @@ struct wide_uint {
         }
         return r;
     }
-    constexpr wide_uint& operator++() { return *this = (*this + wide_uint(1)); }
-    constexpr wide_uint& operator--() { return *this = (*this - wide_uint(1)); }
+    MORTON_HD constexpr wide_uint& operator++() { return *this = (*this + wide_uint(1)); }
+    MORTON_HD constexpr wide_uint& operator--() { return *this = (*this - wide_uint(1)); }
 
     // ---- comparison -------------------------------------------------------
-    friend constexpr bool operator==(const wide_uint& a, const wide_uint& b) {
+    friend MORTON_HD constexpr bool operator==(const wide_uint& a, const wide_uint& b) {
         for (std::size_t i = 0; i < W; ++i)
             if (a.w[i] != b.w[i]) return false;
         return true;
     }
-    friend constexpr bool operator!=(const wide_uint& a, const wide_uint& b) { return !(a == b); }
-    friend constexpr bool operator<(const wide_uint& a, const wide_uint& b) {
+    friend MORTON_HD constexpr bool operator!=(const wide_uint& a, const wide_uint& b) { return !(a == b); }
+    friend MORTON_HD constexpr bool operator<(const wide_uint& a, const wide_uint& b) {
         for (std::size_t i = W; i-- > 0;) {
             if (a.w[i] != b.w[i]) return a.w[i] < b.w[i];
         }
         return false;
     }
-    friend constexpr bool operator>(const wide_uint& a, const wide_uint& b) { return b < a; }
-    friend constexpr bool operator<=(const wide_uint& a, const wide_uint& b) { return !(b < a); }
-    friend constexpr bool operator>=(const wide_uint& a, const wide_uint& b) { return !(a < b); }
+    friend MORTON_HD constexpr bool operator>(const wide_uint& a, const wide_uint& b) { return b < a; }
+    friend MORTON_HD constexpr bool operator<=(const wide_uint& a, const wide_uint& b) { return !(b < a); }
+    friend MORTON_HD constexpr bool operator>=(const wide_uint& a, const wide_uint& b) { return !(a < b); }
 };
 
 }  // namespace detail
