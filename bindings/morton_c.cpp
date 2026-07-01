@@ -124,6 +124,60 @@ inline void add3(const std::uint64_t* code, std::uint64_t* out, std::size_t n, u
     }
 }
 
+// --- Morton-space arithmetic in bulk (per-element core; no batch kernels needed) -------------
+
+// Saturating axis add/sub: signed k (>=0 add_sat, <0 sub_sat), clamped to [0, coord_max].
+template <unsigned Dim, unsigned Bits>
+inline void addsat_(const std::uint64_t* code, std::uint64_t* out, std::size_t n, unsigned axis,
+                    std::int64_t k) {
+    using M = Morton<Dim, Bits>;
+    using C = typename M::coord_type;
+    for (std::size_t i = 0; i < n; ++i) {
+        M m = M::from_code(code[i]);
+        if (k >= 0)
+            m.add_sat(axis, C(std::uint64_t(k)));
+        else
+            m.sub_sat(axis, C(std::uint64_t(-k)));
+        out[i] = m.code();
+    }
+}
+
+// Bounds-checked axis add/sub: out gets the moved code where it stays in [0, coord_max], else the
+// original code; ok[i] = 1 on success, 0 if the move left the grid.
+template <unsigned Dim, unsigned Bits>
+inline void tryadd_(const std::uint64_t* code, std::uint64_t* out, std::uint8_t* ok, std::size_t n,
+                    unsigned axis, std::int64_t k) {
+    using M = Morton<Dim, Bits>;
+    using C = typename M::coord_type;
+    for (std::size_t i = 0; i < n; ++i) {
+        M m = M::from_code(code[i]);
+        bool good = (k >= 0) ? m.try_add(axis, C(std::uint64_t(k)))
+                             : m.try_sub(axis, C(std::uint64_t(-k)));
+        ok[i] = good ? std::uint8_t(1) : std::uint8_t(0);
+        out[i] = good ? m.code() : code[i];
+    }
+}
+
+// von-Neumann face neighbours: out is n x (2*Dim), row i = [-x,+x,-y,+y,(-z,+z)] wrapping neighbours.
+template <unsigned Dim, unsigned Bits>
+inline void faceneigh_(const std::uint64_t* code, std::uint64_t* out, std::size_t n) {
+    using M = Morton<Dim, Bits>;
+    for (std::size_t i = 0; i < n; ++i) {
+        auto fn = M::from_code(code[i]).face_neighbors();
+        for (std::size_t j = 0; j < fn.size(); ++j) out[i * fn.size() + j] = fn[j].code();
+    }
+}
+
+// Moore neighbours: out is n x (3^Dim - 1).
+template <unsigned Dim, unsigned Bits>
+inline void allneigh_(const std::uint64_t* code, std::uint64_t* out, std::size_t n) {
+    using M = Morton<Dim, Bits>;
+    for (std::size_t i = 0; i < n; ++i) {
+        auto an = M::from_code(code[i]).all_neighbors();
+        for (std::size_t j = 0; j < an.size(); ++j) out[i * an.size() + j] = an[j].code();
+    }
+}
+
 }  // namespace
 
 #define API extern "C" __attribute__((visibility("default")))
@@ -161,6 +215,25 @@ inline void add3(const std::uint64_t* code, std::uint64_t* out, std::size_t n, u
         std::size_t i = 0;                                                          \
         morton::for_each_in_box_zorder<2, BITS>(a, b,                               \
             [&](M m) { out[i++] = m.code(); });                                     \
+    }                                                                               \
+    API void mortonarith_addsat2_##SUFFIX(const std::uint64_t* code,                \
+                                          std::uint64_t* out, std::size_t n,        \
+                                          unsigned axis, std::int64_t k) {          \
+        addsat_<2, BITS>(code, out, n, axis, k);                                    \
+    }                                                                               \
+    API void mortonarith_tryadd2_##SUFFIX(const std::uint64_t* code,                \
+                                          std::uint64_t* out, std::uint8_t* ok,     \
+                                          std::size_t n, unsigned axis,             \
+                                          std::int64_t k) {                         \
+        tryadd_<2, BITS>(code, out, ok, n, axis, k);                                \
+    }                                                                               \
+    API void mortonarith_faceneighbors2_##SUFFIX(const std::uint64_t* code,         \
+                                                 std::uint64_t* out, std::size_t n) { \
+        faceneigh_<2, BITS>(code, out, n);                                          \
+    }                                                                               \
+    API void mortonarith_allneighbors2_##SUFFIX(const std::uint64_t* code,          \
+                                                std::uint64_t* out, std::size_t n) { \
+        allneigh_<2, BITS>(code, out, n);                                           \
     }
 
 DEFINE_2D(u32, 32, std::uint32_t)
@@ -200,6 +273,25 @@ DEFINE_2D(u16, 16, std::uint16_t)
         std::size_t i = 0;                                                          \
         morton::for_each_in_box_zorder<3, BITS>(a, b,                               \
             [&](M m) { out[i++] = m.code(); });                                     \
+    }                                                                               \
+    API void mortonarith_addsat3_##SUFFIX(const std::uint64_t* code,                \
+                                          std::uint64_t* out, std::size_t n,        \
+                                          unsigned axis, std::int64_t k) {          \
+        addsat_<3, BITS>(code, out, n, axis, k);                                    \
+    }                                                                               \
+    API void mortonarith_tryadd3_##SUFFIX(const std::uint64_t* code,                \
+                                          std::uint64_t* out, std::uint8_t* ok,     \
+                                          std::size_t n, unsigned axis,             \
+                                          std::int64_t k) {                         \
+        tryadd_<3, BITS>(code, out, ok, n, axis, k);                                \
+    }                                                                               \
+    API void mortonarith_faceneighbors3_##SUFFIX(const std::uint64_t* code,         \
+                                                 std::uint64_t* out, std::size_t n) { \
+        faceneigh_<3, BITS>(code, out, n);                                          \
+    }                                                                               \
+    API void mortonarith_allneighbors3_##SUFFIX(const std::uint64_t* code,          \
+                                                std::uint64_t* out, std::size_t n) { \
+        allneigh_<3, BITS>(code, out, n);                                           \
     }
 
 DEFINE_3D(u32, 21, std::uint32_t)

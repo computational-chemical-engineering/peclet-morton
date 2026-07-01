@@ -30,7 +30,11 @@ import os
 
 import numpy as np
 
-__all__ = ["encode", "decode", "shift", "box_zorder", "box_count"]
+__all__ = [
+    "encode", "decode", "shift", "box_zorder", "box_count",
+    "neighbor", "face_neighbors", "all_neighbors",
+    "add_sat", "sub_sat", "try_add", "try_sub",
+]
 __version__ = "0.1.0"
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -114,6 +118,80 @@ def shift(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> 
     out = np.empty_like(codes)
     fn = getattr(_lib, f"mortonarith_add{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _sz(codes.size), ctypes.c_uint(axis), ctypes.c_int64(delta))
+    return out
+
+
+def neighbor(codes: np.ndarray, *, axis: int, dir: int, dims: int, bits: int) -> np.ndarray:
+    """One-cell neighbour along `axis` in direction `dir` (+1 or -1), in Morton space.
+
+    The named O(1) form of ``shift(delta=+/-1)``; coordinates wrap modulo 2**bits.
+    """
+    if dir not in (1, -1):
+        raise ValueError("dir must be +1 or -1")
+    return shift(codes, axis=axis, delta=dir, dims=dims, bits=bits)
+
+
+def add_sat(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> np.ndarray:
+    """Add `delta` (signed) to one axis, *saturating* at the grid bounds [0, 2**bits - 1].
+
+    Unlike :func:`shift` (which wraps), coordinates clamp instead of wrapping.
+    """
+    _, suffix = _cfg(dims, bits)
+    codes = np.ascontiguousarray(codes, dtype=np.uint64)
+    out = np.empty_like(codes)
+    fn = getattr(_lib, f"mortonarith_addsat{dims}_{suffix}")
+    fn(_ptr(codes), _ptr(out), _sz(codes.size), ctypes.c_uint(axis), ctypes.c_int64(delta))
+    return out
+
+
+def sub_sat(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> np.ndarray:
+    """Subtract `delta` (>= 0) from one axis, *saturating* at 0. See :func:`add_sat`."""
+    return add_sat(codes, axis=axis, delta=-delta, dims=dims, bits=bits)
+
+
+def try_add(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> tuple:
+    """Bounds-checked axis add. Returns ``(out, ok)``.
+
+    ``ok`` is a bool array: ``True`` where the move stayed in [0, 2**bits - 1]; where ``False``,
+    the corresponding ``out`` entry is the *unchanged* input code (no wrap, no clamp).
+    """
+    _, suffix = _cfg(dims, bits)
+    codes = np.ascontiguousarray(codes, dtype=np.uint64)
+    out = np.empty_like(codes)
+    ok = np.empty(codes.size, dtype=np.uint8)
+    fn = getattr(_lib, f"mortonarith_tryadd{dims}_{suffix}")
+    fn(_ptr(codes), _ptr(out), _ptr(ok), _sz(codes.size), ctypes.c_uint(axis),
+       ctypes.c_int64(delta))
+    return out, ok.astype(bool)
+
+
+def try_sub(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> tuple:
+    """Bounds-checked axis subtract (delta >= 0). Returns ``(out, ok)``. See :func:`try_add`."""
+    return try_add(codes, axis=axis, delta=-delta, dims=dims, bits=bits)
+
+
+def face_neighbors(codes: np.ndarray, *, dims: int, bits: int) -> np.ndarray:
+    """The ``2*dims`` von-Neumann (face) neighbours of each code.
+
+    Returns an ``(N, 2*dims)`` uint64 array; columns are ``[-x, +x, -y, +y(, -z, +z)]`` (wrapping).
+    """
+    _, suffix = _cfg(dims, bits)
+    codes = np.ascontiguousarray(codes, dtype=np.uint64)
+    n = codes.size
+    out = np.empty((n, 2 * dims), dtype=np.uint64)
+    fn = getattr(_lib, f"mortonarith_faceneighbors{dims}_{suffix}")
+    fn(_ptr(codes), _ptr(out), _sz(n))
+    return out
+
+
+def all_neighbors(codes: np.ndarray, *, dims: int, bits: int) -> np.ndarray:
+    """The ``3**dims - 1`` Moore neighbours of each code. Returns an ``(N, 3**dims - 1)`` array."""
+    _, suffix = _cfg(dims, bits)
+    codes = np.ascontiguousarray(codes, dtype=np.uint64)
+    n = codes.size
+    out = np.empty((n, 3 ** dims - 1), dtype=np.uint64)
+    fn = getattr(_lib, f"mortonarith_allneighbors{dims}_{suffix}")
+    fn(_ptr(codes), _ptr(out), _sz(n))
     return out
 
 
