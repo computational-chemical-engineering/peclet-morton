@@ -31,6 +31,7 @@ import os
 import numpy as np
 
 __all__ = ["encode", "decode", "shift", "box_zorder", "box_count"]
+__version__ = "0.1.0"
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
