@@ -8,4 +8,4 @@ target_compile_options(mortonarith_c PRIVATE -O3)
 # Drop the shared library next to the Python package so the ctypes wrapper
 # finds it without an install step.
 set_target_properties(mortonarith_c PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/mortonarith)
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/peclet/morton)

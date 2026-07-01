@@ -52,7 +52,7 @@ endif()
 option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)
 if(MORTON_WHEEL)
     add_subdirectory(bindings)
-    install(TARGETS mortonarith_c LIBRARY DESTINATION mortonarith)
+    install(TARGETS mortonarith_c LIBRARY DESTINATION peclet/morton)
     return()
 endif()
 

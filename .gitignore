@@ -9,3 +9,9 @@ __pycache__/
 
 # generated docs
 /docs/doxygen/
+
+# built ctypes lib + py artifacts
+bindings/python/peclet/morton/libmortonarith_c*
+__pycache__/
+*.pyc
+.pytest_cache/

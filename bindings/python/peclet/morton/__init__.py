@@ -1,4 +1,4 @@
-"""mortonarith - fast Morton (Z-order) codes with arithmetic, for NumPy.
+"""peclet.morton - fast Morton (Z-order) codes with arithmetic, for NumPy.
 
 This is a thin ``ctypes`` wrapper over the C++ ``morton`` library. Every
 operation is vectorised: it runs over whole NumPy arrays in compiled code, so
@@ -13,7 +13,7 @@ Codes are always returned as ``uint64``.
 Example
 -------
 >>> import numpy as np
->>> from mortonarith import encode, decode, shift
+>>> from peclet.morton import encode, decode, shift
 >>> x = np.array([1, 2, 3], dtype=np.uint32)
 >>> y = np.array([4, 5, 6], dtype=np.uint32)
 >>> codes = encode(x, y, bits=32)

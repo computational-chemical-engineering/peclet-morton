@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import mortonarith as ma
+import peclet.morton as ma
 
 
 def ref_encode(coords, bits):

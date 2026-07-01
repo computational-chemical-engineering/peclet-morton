@@ -11,24 +11,29 @@ requires = ["scikit-build-core>=0.5", "numpy>=1.20"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "mortonarith"
+name = "peclet-morton"
 version = "0.1.0"
-description = "Fast Morton (Z-order) codes with O(1) arithmetic, vectorised for NumPy"
+description = "peclet.morton — fast Morton (Z-order) codes with O(1) arithmetic, vectorised for NumPy"
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "Frank Peters" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@gmail.com" }]
 dependencies = ["numpy>=1.20"]
 
 [project.urls]
-Homepage = "https://github.com/computational-chemical-engineering/morton_artithmetic"
+Homepage = "https://github.com/computational-chemical-engineering/peclet"
+Source = "https://github.com/computational-chemical-engineering/morton"
 
 [tool.scikit-build]
 minimum-version = "0.8"
 cmake.version = ">=3.16"
 cmake.args = ["-DMORTON_WHEEL=ON"]
-wheel.packages = ["bindings/python/mortonarith"]
-sdist.include = ["include", "bindings", "CMakeLists.txt"]
+# Copy the peclet namespace dir (contains morton/) into the wheel; no peclet/__init__.py
+# so `peclet` stays an implicit PEP-420 namespace shared with the other peclet-* packages.
+# CMake installs the built libmortonarith_c.so into peclet/morton/ alongside it.
+wheel.packages = ["bindings/python/peclet"]
+sdist.include = ["include", "bindings", "CMakeLists.txt", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["bindings/python/tests"]

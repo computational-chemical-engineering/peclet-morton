@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 
-import mortonarith as ma
+import peclet.morton as ma
 
 N = 1 << 22
 rng = np.random.default_rng(0)
