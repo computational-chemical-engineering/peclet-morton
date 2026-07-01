@@ -52,7 +52,10 @@ endif()
 option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)
 if(MORTON_WHEEL)
     add_subdirectory(bindings)
-    install(TARGETS mortonarith_c LIBRARY DESTINATION peclet/morton)
+    # LIBRARY = .so/.dylib (Linux/macOS); RUNTIME = .dll (Windows — the actual loadable artifact for ctypes)
+    install(TARGETS mortonarith_c
+            LIBRARY DESTINATION peclet/morton
+            RUNTIME DESTINATION peclet/morton)
     return()
 endif()
 

@@ -41,7 +41,13 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_library() -> ctypes.CDLL:
-    candidates = glob.glob(os.path.join(_HERE, "libmortonarith_c*"))
+    # Match the shared lib across platforms: libmortonarith_c.so / .dylib (Linux/macOS) and
+    # mortonarith_c.dll (Windows — no 'lib' prefix). Exclude MSVC import/aux files (.lib/.exp/.pdb).
+    loadable = (".so", ".dylib", ".dll", ".pyd")
+    candidates = [
+        p for p in glob.glob(os.path.join(_HERE, "*mortonarith_c*"))
+        if p.endswith(loadable) or ".so." in os.path.basename(p)
+    ]
     if not candidates:
         raise ImportError(
             "mortonarith native library not found. Build it first:\n"
