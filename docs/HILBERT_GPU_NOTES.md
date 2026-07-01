@@ -67,7 +67,7 @@ The bulk array ops in `batch.hpp` are embarrassingly parallel; large point sets
 - Provide kernels for `encode`, `decode`, `add/step` (per-axis), and a sort
   (Z-order sort = radix sort on the code) which is the usual reason to go to GPU.
 - Keep the host API NumPy-shaped (arrays in, arrays out) so the existing
-  `bindings/` story extends: a `mortonarith.cuda` submodule mirroring the CPU
+  `bindings/` story extends: a `peclet.morton.cuda` submodule mirroring the CPU
   functions, dispatching on array device.
 
 ### Practicalities

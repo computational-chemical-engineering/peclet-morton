@@ -45,7 +45,7 @@ ctest --test-dir build_kokkos -R morton_kokkos_tests --output-on-failure
 pip install .                                     # builds extension, bundles .so
 python -m pytest bindings/python/tests -q
 # or dev loop without installing:
-cmake --build build --target mortonarith_c        # drops .so into bindings/python/mortonarith/
+cmake --build build --target mortonarith_c        # drops .so into bindings/python/peclet/morton/
 PYTHONPATH=bindings/python python3 -m pytest bindings/python/tests -q
 ```
 
@@ -94,7 +94,7 @@ The core's functions are prefixed with `MORTON_HD`. It now resolves to **`KOKKOS
 
 `morton::kokkos` offers `Kokkos::View`-based bulk ops — `encode2/3`, `decode2/3`, per-axis `add`/`sub`/`step` (execution space deduced from the View) — plus `*_host` raw-pointer convenience wrappers (stage to device Views, run, copy back). `tests/kokkos/test_kokkos.cpp` validates device output bit-for-bit against the scalar `Morton<>` reference for all four binding layouts `(2,32) (2,16) (3,21) (3,16)`; `benchmarks/bench_kokkos.cpp` shows device-resident ~51 GMops/s (CUDA) vs PCIe-bound host round-trip.
 
-Build: opt-in with `-DMORTON_ENABLE_KOKKOS=ON` + `find_package(Kokkos CONFIG)` against the suite's bootstrapped prefix (`extern/install/<backend>` from `tools/bootstrap_deps.sh`) on `CMAKE_PREFIX_PATH`, exactly like `sdflow`/`dem`. Device sources stay plain `.cpp` — Kokkos 5.x routes them through the launch compiler (see `../cmake/SuiteKokkos.cmake`). The plain (non-Kokkos) build never touches Kokkos and is unchanged. **The raw-CUDA backend was retired** (was `cuda/`, `morton::cuda`); the last raw-CUDA tree is at the `pre-cuda-retirement` git tag.
+Build: opt-in with `-DMORTON_ENABLE_KOKKOS=ON` + `find_package(Kokkos CONFIG)` against the suite's bootstrapped prefix (`extern/install/<backend>` from `tools/bootstrap_deps.sh`) on `CMAKE_PREFIX_PATH`, exactly like `flow`/`dem`. Device sources stay plain `.cpp` — Kokkos 5.x routes them through the launch compiler (see `../cmake/SuiteKokkos.cmake`). The plain (non-Kokkos) build never touches Kokkos and is unchanged. **The raw-CUDA backend was retired** (was `cuda/`, `morton::cuda`); the last raw-CUDA tree is at the `pre-cuda-retirement` git tag.
 
 ### Octree → sibling `octree/` project
 

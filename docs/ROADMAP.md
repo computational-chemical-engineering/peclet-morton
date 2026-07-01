@@ -21,7 +21,7 @@ are listed in "Done since v0.2" further down:
 - ✅ **(3) Saturating / checked arithmetic** — `add_sat`, `sub_sat`, `try_add`,
   `try_sub` clamp or refuse instead of wrapping.
 - ✅ **(4) Real Python build** — `scikit-build-core`; `pip install .` builds the
-  extension and produces a proper wheel (`mortonarith-*.whl`) with the `.so`
+  extension and produces a proper wheel (`peclet_morton-*.whl`) with the `.so`
   bundled. (PyPI publishing still pending — see below.)
 - ✅ **(5) Docs site** — Doxygen config (`docs/Doxyfile`) + `docs` CMake target.
 - ✅ **(6) Wider codes (> 64 bits)** — `__uint128_t` storage where available, so

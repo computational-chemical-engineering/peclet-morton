@@ -137,7 +137,9 @@ region iterators against brute force (>1M assertions).
 ## Python
 
 A vectorised NumPy interface (pure `ctypes`, no pybind11/native build deps
-beyond a C++ compiler). Install as a wheel with scikit-build-core:
+beyond a C++ compiler), published on PyPI as **`peclet-morton`** and imported as
+**`peclet.morton`** (part of the `peclet` suite namespace). Install as a wheel
+with scikit-build-core:
 
 ```bash
 pip install .            # builds the extension and bundles it into the wheel
@@ -145,7 +147,7 @@ python -m pytest bindings/python/tests -q
 ```
 
 ```python
-import numpy as np, mortonarith as ma
+import numpy as np, peclet.morton as ma
 x = np.arange(1000, dtype=np.uint32); y = x * 2
 codes = ma.encode(x, y, bits=32)
 shifted = ma.shift(codes, axis=0, delta=+1, dims=2, bits=32)  # +1 in x, no decode
