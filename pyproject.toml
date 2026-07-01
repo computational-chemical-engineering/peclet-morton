@@ -23,7 +23,7 @@ dependencies = ["numpy>=1.20"]
 
 [project.urls]
 Homepage = "https://github.com/computational-chemical-engineering/peclet"
-Source = "https://github.com/computational-chemical-engineering/morton"
+Source = "https://github.com/computational-chemical-engineering/peclet-morton"
 
 [tool.scikit-build]
 minimum-version = "0.8"
