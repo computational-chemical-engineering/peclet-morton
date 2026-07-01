@@ -180,7 +180,11 @@ inline void allneigh_(const std::uint64_t* code, std::uint64_t* out, std::size_t
 
 }  // namespace
 
-#define API extern "C" __attribute__((visibility("default")))
+#if defined(_WIN32)
+#  define API extern "C" __declspec(dllexport)          // MSVC: export from the DLL for ctypes
+#else
+#  define API extern "C" __attribute__((visibility("default")))
+#endif
 
 // ---------------------------------------------------------------------------
 // 2D configurations
