@@ -1,5 +1,10 @@
 # morton-arithmetic
 
+[![PyPI version](https://img.shields.io/pypi/v/peclet-morton.svg)](https://pypi.org/project/peclet-morton/)
+[![Python versions](https://img.shields.io/pypi/pyversions/peclet-morton.svg)](https://pypi.org/project/peclet-morton/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml)
+
 A small, header-only **C++17** library for Morton (Z-order) codes whose
 distinguishing feature is **arithmetic directly in Morton space**.
 
