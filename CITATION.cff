@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "peclet-morton: Morton/Z-order codes with arithmetic in Morton space"
+abstract: >-
+  A small, header-only C++17 library for Morton (Z-order) codes whose distinguishing feature is
+  arithmetic directly in Morton space — neighbour-find, axis add, and Z-order stepping without
+  decode/re-encode. Provides BMI2/AVX-512 kernels with runtime dispatch, a portable Kokkos GPU backend
+  (CUDA/HIP/OpenMP), and Python bindings. The foundational spatial-index primitive of the peclet suite.
+type: software
+authors:
+  - family-names: Peters
+    given-names: Frank
+    email: e.a.j.f.peters@gmail.com
+    affiliation: "Eindhoven University of Technology"
+version: 0.2.0
+date-released: "2026-07-02"
+license: MIT
+doi: 10.5281/zenodo.21132433
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21132433
+    description: "Concept DOI (all versions) — always resolves to the latest release"
+  - type: doi
+    value: 10.5281/zenodo.21132434
+    description: "Version DOI for v0.2.0"
+repository-code: "https://github.com/computational-chemical-engineering/peclet-morton"
+keywords:
+  - Morton code
+  - Z-order curve
+  - space-filling curve
+  - spatial indexing
+  - BMI2
+  - AVX-512
+  - Kokkos
+  - GPU computing
