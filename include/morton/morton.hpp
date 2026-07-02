@@ -2,8 +2,8 @@
 /// @brief Core `Morton<Dim,Bits>` type — Z-order codes with O(1) arithmetic in Morton space.
 ///
 /// A small, header-only C++17 library for Morton (Z-order) codes whose distinguishing feature is
-/// *arithmetic directly in Morton space*: you can increment, decrement, add to or step along a single
-/// axis, or find a neighbour, in a handful of branchless instructions — without decoding to
+/// *arithmetic directly in Morton space*: you can increment, decrement, add to or step along a
+/// single axis, or find a neighbour, in a handful of branchless instructions — without decoding to
 /// coordinates and re-encoding.
 ///
 /// Encoding/decoding uses the BMI2 PDEP/PEXT instructions when available (`-mbmi2`, codes up to 64
@@ -32,9 +32,8 @@
 //   Gates the runtime CPU-feature queries and the AVX-512 batch kernels, which
 //   use per-function `target` attributes so they need no global -mavx512f/-mbmi2
 //   and never run unless the executing CPU actually supports the instructions.
-#if (defined(__x86_64__) || defined(_M_X64)) \
-        && (defined(__GNUC__) || defined(__clang__)) \
-        && !defined(__CUDACC__) && !defined(__HIPCC__)
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__)) && \
+    !defined(__CUDACC__) && !defined(__HIPCC__)
 #define MORTON_X86 1
 #else
 #define MORTON_X86 0
@@ -75,8 +74,8 @@
 //
 // MORTON_HD (the host/device function marker) lives in its own header so that headers included
 // above — wide_uint.hpp in particular — can annotate their operators device-callable too. It is
-// already pulled in transitively via wide_uint.hpp; include it here as well for the direct/standalone
-// case. See morton/hd.hpp for the Kokkos-vs-raw-CUDA-vs-host resolution.
+// already pulled in transitively via wide_uint.hpp; include it here as well for the
+// direct/standalone case. See morton/hd.hpp for the Kokkos-vs-raw-CUDA-vs-host resolution.
 #include "morton/hd.hpp"
 
 namespace morton {
@@ -92,23 +91,22 @@ using uint128_t = unsigned __int128;
 template <unsigned NBits>
 struct uint_for {
 #if defined(MORTON_HAS_INT128)
-    static constexpr unsigned builtin_max = 128;
+  static constexpr unsigned builtin_max = 128;
 #else
-    static constexpr unsigned builtin_max = 64;
+  static constexpr unsigned builtin_max = 64;
 #endif
-    using builtin = std::conditional_t<
-        (NBits <= 8), std::uint8_t,
-        std::conditional_t<
-            (NBits <= 16), std::uint16_t,
-            std::conditional_t<(NBits <= 32), std::uint32_t,
+  using builtin = std::conditional_t<
+      (NBits <= 8), std::uint8_t,
+      std::conditional_t<
+          (NBits <= 16), std::uint16_t,
+          std::conditional_t<(NBits <= 32), std::uint32_t,
 #if defined(MORTON_HAS_INT128)
-                               std::conditional_t<(NBits <= 64), std::uint64_t, uint128_t>
+                             std::conditional_t<(NBits <= 64), std::uint64_t, uint128_t>
 #else
-                               std::uint64_t
+                             std::uint64_t
 #endif
-                               >>>;
-    using type = std::conditional_t<(NBits <= builtin_max), builtin,
-                                     wide_uint<(NBits + 63) / 64>>;
+                             >>>;
+  using type = std::conditional_t<(NBits <= builtin_max), builtin, wide_uint<(NBits + 63) / 64>>;
 };
 template <unsigned NBits>
 using uint_for_t = typename uint_for<NBits>::type;
@@ -117,52 +115,53 @@ using uint_for_t = typename uint_for<NBits>::type;
 // (non-constexpr) BMI2 intrinsics when evaluated at compile time.
 MORTON_HD constexpr bool is_consteval() noexcept {
 #if defined(__cpp_if_consteval)
-    if consteval {
-        return true;
-    } else {
-        return false;
-    }
-#elif defined(__GNUC__) || defined(__clang__)
-    return __builtin_is_constant_evaluated();
-#else
+  if consteval {
+    return true;
+  } else {
     return false;
+  }
+#elif defined(__GNUC__) || defined(__clang__)
+  return __builtin_is_constant_evaluated();
+#else
+  return false;
 #endif
 }
 
 // 3^n, as a compile-time value (size of a Moore neighbourhood including self).
 MORTON_HD constexpr unsigned pow3(unsigned n) {
-    unsigned r = 1;
-    for (unsigned i = 0; i < n; ++i) r *= 3;
-    return r;
+  unsigned r = 1;
+  for (unsigned i = 0; i < n; ++i)
+    r *= 3;
+  return r;
 }
 
 // Build the mask selecting the bits that belong to axis `d` in a code with
 // `Dim` interleaved axes of `Bits` bits each: positions d, d+Dim, d+2*Dim, ...
 template <unsigned Dim, unsigned Bits, typename Code>
 MORTON_HD constexpr Code axis_mask(unsigned d) {
-    Code m = 0;
-    for (unsigned i = 0; i < Bits; ++i)
-        m |= (Code(1) << (i * Dim + d));
-    return m;
+  Code m = 0;
+  for (unsigned i = 0; i < Bits; ++i)
+    m |= (Code(1) << (i * Dim + d));
+  return m;
 }
 
 // Software deposit: spread the low `Bits` bits of x across positions
 // d, d+Dim, ... (the portable fallback for PDEP). Works for any code width.
 template <unsigned Dim, unsigned Bits, typename Code, typename Coord>
 MORTON_HD constexpr Code spread_sw(Coord x, unsigned d) {
-    Code r = 0;
-    for (unsigned i = 0; i < Bits; ++i)
-        r |= Code(Code(x >> i) & Code(1)) << (i * Dim + d);
-    return r;
+  Code r = 0;
+  for (unsigned i = 0; i < Bits; ++i)
+    r |= Code(Code(x >> i) & Code(1)) << (i * Dim + d);
+  return r;
 }
 
 // Software extract: inverse of spread_sw (the portable fallback for PEXT).
 template <unsigned Dim, unsigned Bits, typename Code, typename Coord>
 MORTON_HD constexpr Coord compact_sw(Code c, unsigned d) {
-    Coord r = 0;
-    for (unsigned i = 0; i < Bits; ++i)
-        r |= Coord(Coord(c >> (i * Dim + d)) & Coord(1)) << i;
-    return r;
+  Coord r = 0;
+  for (unsigned i = 0; i < Bits; ++i)
+    r |= Coord(Coord(c >> (i * Dim + d)) & Coord(1)) << i;
+  return r;
 }
 
 #if MORTON_X86
@@ -170,16 +169,16 @@ MORTON_HD constexpr Coord compact_sw(Code c, unsigned d) {
 // bitfield when the feature is present, so compare against 0. The first call
 // triggers detection; results are memoised in function-local statics.
 inline bool cpu_has_bmi2() {
-    static const bool v = __builtin_cpu_supports("bmi2") != 0;
-    return v;
+  static const bool v = __builtin_cpu_supports("bmi2") != 0;
+  return v;
 }
 inline bool cpu_has_avx2() {
-    static const bool v = __builtin_cpu_supports("avx2") != 0;
-    return v;
+  static const bool v = __builtin_cpu_supports("avx2") != 0;
+  return v;
 }
 inline bool cpu_has_avx512f() {
-    static const bool v = __builtin_cpu_supports("avx512f") != 0;
-    return v;
+  static const bool v = __builtin_cpu_supports("avx512f") != 0;
+  return v;
 }
 #endif
 
@@ -188,10 +187,10 @@ inline bool cpu_has_avx512f() {
 // attribute), so the rest of the binary stays portable; only ever called from
 // the !is_consteval() runtime path guarded by cpu_has_bmi2().
 __attribute__((target("bmi2"))) inline std::uint64_t pdep_u64_hw(std::uint64_t v, std::uint64_t m) {
-    return _pdep_u64(v, m);
+  return _pdep_u64(v, m);
 }
 __attribute__((target("bmi2"))) inline std::uint64_t pext_u64_hw(std::uint64_t v, std::uint64_t m) {
-    return _pext_u64(v, m);
+  return _pext_u64(v, m);
 }
 #endif
 
@@ -202,314 +201,333 @@ __attribute__((target("bmi2"))) inline std::uint64_t pext_u64_hw(std::uint64_t v
 /// smallest unsigned integer that fits.
 template <unsigned Dim, unsigned Bits>
 class Morton {
-    static_assert(Dim >= 1, "Dim must be >= 1");
-    static_assert(Bits >= 1, "Bits must be >= 1");
-    static_assert(Dim * Bits <= MORTON_MAX_BITS,
-                  "Dim * Bits exceeds MORTON_MAX_BITS (raise it if you need wider codes)");
+  static_assert(Dim >= 1, "Dim must be >= 1");
+  static_assert(Bits >= 1, "Bits must be >= 1");
+  static_assert(Dim * Bits <= MORTON_MAX_BITS,
+                "Dim * Bits exceeds MORTON_MAX_BITS (raise it if you need wider codes)");
 
-public:
-    static constexpr unsigned dimensions = Dim;
-    static constexpr unsigned bits_per_axis = Bits;
-    static constexpr unsigned code_bits = Dim * Bits;
+ public:
+  static constexpr unsigned dimensions = Dim;
+  static constexpr unsigned bits_per_axis = Bits;
+  static constexpr unsigned code_bits = Dim * Bits;
 
-    using code_type = detail::uint_for_t<Dim * Bits>;
-    using coord_type = detail::uint_for_t<Bits>;
+  using code_type = detail::uint_for_t<Dim * Bits>;
+  using coord_type = detail::uint_for_t<Bits>;
 
-private:
-    static constexpr unsigned code_type_bits = sizeof(code_type) * CHAR_BIT;
-    static constexpr unsigned coord_type_bits = sizeof(coord_type) * CHAR_BIT;
+ private:
+  static constexpr unsigned code_type_bits = sizeof(code_type) * CHAR_BIT;
+  static constexpr unsigned coord_type_bits = sizeof(coord_type) * CHAR_BIT;
 
-public:
-    /// Mask of all valid code bits (handles code_bits == width without UB).
-    static constexpr code_type field_mask =
-        (code_bits >= code_type_bits) ? code_type(~code_type(0))
-                                      : code_type((code_type(1) << code_bits) - 1);
+ public:
+  /// Mask of all valid code bits (handles code_bits == width without UB).
+  static constexpr code_type field_mask = (code_bits >= code_type_bits)
+                                              ? code_type(~code_type(0))
+                                              : code_type((code_type(1) << code_bits) - 1);
 
-    /// Largest representable coordinate value per axis.
-    static constexpr coord_type coord_max =
-        (Bits >= coord_type_bits) ? coord_type(~coord_type(0))
-                                  : coord_type((coord_type(1) << Bits) - 1);
+  /// Largest representable coordinate value per axis.
+  static constexpr coord_type coord_max = (Bits >= coord_type_bits)
+                                              ? coord_type(~coord_type(0))
+                                              : coord_type((coord_type(1) << Bits) - 1);
 
-    static constexpr unsigned octants = unsigned(1) << Dim;  // children per node
+  static constexpr unsigned octants = unsigned(1) << Dim;  // children per node
 
-    // ---- construction -----------------------------------------------------
+  // ---- construction -----------------------------------------------------
 
-    MORTON_HD constexpr Morton() noexcept : code_(0) {}
+  MORTON_HD constexpr Morton() noexcept : code_(0) {}
 
-    /// Wrap a raw, already-interleaved code value.
-    MORTON_HD static constexpr Morton from_code(code_type raw) noexcept {
-        Morton m;
-        m.code_ = raw & field_mask;
-        return m;
+  /// Wrap a raw, already-interleaved code value.
+  MORTON_HD static constexpr Morton from_code(code_type raw) noexcept {
+    Morton m;
+    m.code_ = raw & field_mask;
+    return m;
+  }
+
+  /// Encode `Dim` coordinates into a Morton code.
+  template <typename... Cs, typename = std::enable_if_t<sizeof...(Cs) == Dim>>
+  MORTON_HD static constexpr Morton encode(Cs... coords) {
+    coord_type tmp[Dim] = {static_cast<coord_type>(coords)...};
+    Morton m;
+    for (unsigned d = 0; d < Dim; ++d)
+      m.code_ |= deposit(tmp[d], d);
+    return m;
+  }
+
+  /// Encode from an array of coordinates.
+  MORTON_HD static constexpr Morton encode(const std::array<coord_type, Dim>& c) {
+    Morton m;
+    for (unsigned d = 0; d < Dim; ++d)
+      m.code_ |= deposit(c[d], d);
+    return m;
+  }
+
+  // ---- access -----------------------------------------------------------
+
+  MORTON_HD constexpr code_type code() const noexcept { return code_; }
+
+  /// Decode coordinate of a single axis.
+  MORTON_HD constexpr coord_type get(unsigned d) const { return extract(code_, d); }
+
+  /// Decode all coordinates.
+  MORTON_HD constexpr std::array<coord_type, Dim> decode() const {
+    std::array<coord_type, Dim> out{};
+    for (unsigned d = 0; d < Dim; ++d)
+      out[d] = extract(code_, d);
+    return out;
+  }
+
+  /// Replace one axis' coordinate (other axes untouched). Wraps mod 2^Bits.
+  MORTON_HD constexpr void set(unsigned d, coord_type value) {
+    code_ = (code_ & keep_mask(d)) | deposit(value, d);
+  }
+
+  // ---- the headline: arithmetic in Morton space -------------------------
+  //
+  // Each of these touches only the bits of one axis and leaves the other
+  // axes' interleaved bits exactly where they are -- no decode/encode.
+  // All wrap modulo 2^Bits on the affected axis.
+
+  /// Add `k` to axis `d` (wraps). O(1), branchless.
+  MORTON_HD constexpr void add(unsigned d, coord_type k) {
+    const code_type M = axis_mask(d);
+    code_type s = (code_ | ~M) + deposit(k, d);
+    code_ = (s & M) | (code_ & M_complement(d));
+  }
+
+  /// Subtract `k` from axis `d` (wraps). O(1), branchless.
+  MORTON_HD constexpr void sub(unsigned d, coord_type k) {
+    const code_type M = axis_mask(d);
+    code_type s = (code_ & M) - deposit(k, d);
+    code_ = (s & M) | (code_ & M_complement(d));
+  }
+
+  /// Increment axis `d` by one. O(1).
+  MORTON_HD constexpr void inc(unsigned d) {
+    const code_type M = axis_mask(d);
+    code_type s = (code_ | ~M) + lsb(d);
+    code_ = (s & M) | (code_ & M_complement(d));
+  }
+
+  /// Decrement axis `d` by one. O(1).
+  MORTON_HD constexpr void dec(unsigned d) {
+    const code_type M = axis_mask(d);
+    code_type s = (code_ & M) - lsb(d);
+    code_ = (s & M) | (code_ & M_complement(d));
+  }
+
+  /// Morton code of the neighbour one step along `±` axis `d` (wraps).
+  MORTON_HD constexpr Morton neighbor(unsigned d, int dir) const {
+    Morton m = *this;
+    if (dir >= 0)
+      m.inc(d);
+    else
+      m.dec(d);
+    return m;
+  }
+
+  // ---- saturating / checked arithmetic (do not wrap) --------------------
+
+  /// Add `k` to axis `d`, clamping at coord_max instead of wrapping.
+  MORTON_HD constexpr void add_sat(unsigned d, coord_type k) {
+    coord_type cur = get(d);
+    coord_type room = coord_type(coord_max - cur);
+    set(d, (k > room) ? coord_max : coord_type(cur + k));
+  }
+
+  /// Subtract `k` from axis `d`, clamping at 0 instead of wrapping.
+  MORTON_HD constexpr void sub_sat(unsigned d, coord_type k) {
+    coord_type cur = get(d);
+    set(d, (k > cur) ? coord_type(0) : coord_type(cur - k));
+  }
+
+  /// Add `k` to axis `d` only if it does not overflow past coord_max.
+  /// Returns false (and leaves the code unchanged) if it would.
+  MORTON_HD constexpr bool try_add(unsigned d, coord_type k) {
+    coord_type cur = get(d);
+    if (k > coord_type(coord_max - cur))
+      return false;
+    set(d, coord_type(cur + k));
+    return true;
+  }
+
+  /// Subtract `k` from axis `d` only if it does not underflow past 0.
+  MORTON_HD constexpr bool try_sub(unsigned d, coord_type k) {
+    coord_type cur = get(d);
+    if (k > cur)
+      return false;
+    set(d, coord_type(cur - k));
+    return true;
+  }
+
+  // ---- neighbour sets ----------------------------------------------------
+
+  /// The 2*Dim von Neumann (face) neighbours, ordered
+  /// {axis0-, axis0+, axis1-, axis1+, ...}. Wraps at the grid edge.
+  MORTON_HD constexpr std::array<Morton, 2 * Dim> face_neighbors() const {
+    std::array<Morton, 2 * Dim> out{};
+    for (unsigned d = 0; d < Dim; ++d) {
+      out[2 * d] = neighbor(d, -1);
+      out[2 * d + 1] = neighbor(d, +1);
     }
+    return out;
+  }
 
-    /// Encode `Dim` coordinates into a Morton code.
-    template <typename... Cs, typename = std::enable_if_t<sizeof...(Cs) == Dim>>
-    MORTON_HD static constexpr Morton encode(Cs... coords) {
-        coord_type tmp[Dim] = {static_cast<coord_type>(coords)...};
-        Morton m;
-        for (unsigned d = 0; d < Dim; ++d)
-            m.code_ |= deposit(tmp[d], d);
-        return m;
+  /// The 3^Dim - 1 Moore neighbours (all cells differing by -1/0/+1 on each
+  /// axis, excluding self), in odometer order. Wraps at the grid edge.
+  MORTON_HD constexpr std::array<Morton, detail::pow3(Dim) - 1> all_neighbors() const {
+    std::array<Morton, detail::pow3(Dim) - 1> out{};
+    unsigned n = 0;
+    for (unsigned i = 0; i < detail::pow3(Dim); ++i) {
+      int off[Dim];
+      unsigned t = i;
+      bool zero = true;
+      for (unsigned d = 0; d < Dim; ++d) {
+        off[d] = int(t % 3) - 1;
+        if (off[d] != 0)
+          zero = false;
+        t /= 3;
+      }
+      if (zero)
+        continue;  // skip self
+      Morton m = *this;
+      for (unsigned d = 0; d < Dim; ++d) {
+        if (off[d] > 0)
+          m.inc(d);
+        else if (off[d] < 0)
+          m.dec(d);
+      }
+      out[n++] = m;
     }
+    return out;
+  }
 
-    /// Encode from an array of coordinates.
-    MORTON_HD static constexpr Morton encode(const std::array<coord_type, Dim>& c) {
-        Morton m;
-        for (unsigned d = 0; d < Dim; ++d)
-            m.code_ |= deposit(c[d], d);
-        return m;
-    }
+  // ---- octree / hierarchy navigation ------------------------------------
+  //
+  // A cell at `level` covers a 2^level block per axis and has its low
+  // level*Dim code bits zero. These helpers express that hierarchy directly.
 
-    // ---- access -----------------------------------------------------------
+  /// Ancestor cell origin at the given `level` (clears the low level*Dim
+  /// bits). level 0 is `*this`.
+  MORTON_HD constexpr Morton ancestor(unsigned level) const {
+    if (level * Dim >= code_bits)
+      return Morton{};
+    code_type lowmask = (code_type(1) << (level * Dim)) - 1;
+    return from_code(code_ & ~lowmask);
+  }
 
-    MORTON_HD constexpr code_type code() const noexcept { return code_; }
+  /// Index (0 .. 2^Dim-1) of this cell within its parent at `level+1`,
+  /// i.e. the Dim interleaved bits just above the level boundary.
+  MORTON_HD constexpr unsigned child_index(unsigned level) const {
+    return unsigned((code_ >> (level * Dim)) & (octants - 1));
+  }
 
-    /// Decode coordinate of a single axis.
-    MORTON_HD constexpr coord_type get(unsigned d) const { return extract(code_, d); }
+  /// The `octant`-th child origin of a cell that is an ancestor at `level`
+  /// (i.e. set the Dim bits at position (level-1)*Dim). Requires level >= 1.
+  MORTON_HD constexpr Morton child(unsigned level, unsigned octant) const {
+    unsigned shift = (level - 1) * Dim;
+    code_type cleared = code_ & ~(code_type(octants - 1) << shift);
+    return from_code(cleared | (code_type(octant) << shift));
+  }
 
-    /// Decode all coordinates.
-    MORTON_HD constexpr std::array<coord_type, Dim> decode() const {
-        std::array<coord_type, Dim> out{};
-        for (unsigned d = 0; d < Dim; ++d)
-            out[d] = extract(code_, d);
-        return out;
-    }
+  // ---- Z-order successor / predecessor ----------------------------------
 
-    /// Replace one axis' coordinate (other axes untouched). Wraps mod 2^Bits.
-    MORTON_HD constexpr void set(unsigned d, coord_type value) {
-        code_ = (code_ & keep_mask(d)) | deposit(value, d);
-    }
+  MORTON_HD constexpr Morton& operator++() noexcept {
+    code_ = (code_ + 1) & field_mask;
+    return *this;
+  }
+  MORTON_HD constexpr Morton operator++(int) noexcept {
+    Morton t = *this;
+    ++*this;
+    return t;
+  }
+  MORTON_HD constexpr Morton& operator--() noexcept {
+    code_ = (code_ - 1) & field_mask;
+    return *this;
+  }
+  MORTON_HD constexpr Morton operator--(int) noexcept {
+    Morton t = *this;
+    --*this;
+    return t;
+  }
 
-    // ---- the headline: arithmetic in Morton space -------------------------
-    //
-    // Each of these touches only the bits of one axis and leaves the other
-    // axes' interleaved bits exactly where they are -- no decode/encode.
-    // All wrap modulo 2^Bits on the affected axis.
+  // ---- comparison (Z-order) ---------------------------------------------
 
-    /// Add `k` to axis `d` (wraps). O(1), branchless.
-    MORTON_HD constexpr void add(unsigned d, coord_type k) {
-        const code_type M = axis_mask(d);
-        code_type s = (code_ | ~M) + deposit(k, d);
-        code_ = (s & M) | (code_ & M_complement(d));
-    }
+  friend MORTON_HD constexpr bool operator==(Morton a, Morton b) noexcept {
+    return a.code_ == b.code_;
+  }
+  friend MORTON_HD constexpr bool operator!=(Morton a, Morton b) noexcept {
+    return a.code_ != b.code_;
+  }
+  friend MORTON_HD constexpr bool operator<(Morton a, Morton b) noexcept {
+    return a.code_ < b.code_;
+  }
+  friend MORTON_HD constexpr bool operator<=(Morton a, Morton b) noexcept {
+    return a.code_ <= b.code_;
+  }
+  friend MORTON_HD constexpr bool operator>(Morton a, Morton b) noexcept {
+    return a.code_ > b.code_;
+  }
+  friend MORTON_HD constexpr bool operator>=(Morton a, Morton b) noexcept {
+    return a.code_ >= b.code_;
+  }
 
-    /// Subtract `k` from axis `d` (wraps). O(1), branchless.
-    MORTON_HD constexpr void sub(unsigned d, coord_type k) {
-        const code_type M = axis_mask(d);
-        code_type s = (code_ & M) - deposit(k, d);
-        code_ = (s & M) | (code_ & M_complement(d));
-    }
+  // ---- low-level deposit/extract ----------------------------------------
 
-    /// Increment axis `d` by one. O(1).
-    MORTON_HD constexpr void inc(unsigned d) {
-        const code_type M = axis_mask(d);
-        code_type s = (code_ | ~M) + lsb(d);
-        code_ = (s & M) | (code_ & M_complement(d));
-    }
-
-    /// Decrement axis `d` by one. O(1).
-    MORTON_HD constexpr void dec(unsigned d) {
-        const code_type M = axis_mask(d);
-        code_type s = (code_ & M) - lsb(d);
-        code_ = (s & M) | (code_ & M_complement(d));
-    }
-
-    /// Morton code of the neighbour one step along `±` axis `d` (wraps).
-    MORTON_HD constexpr Morton neighbor(unsigned d, int dir) const {
-        Morton m = *this;
-        if (dir >= 0)
-            m.inc(d);
-        else
-            m.dec(d);
-        return m;
-    }
-
-    // ---- saturating / checked arithmetic (do not wrap) --------------------
-
-    /// Add `k` to axis `d`, clamping at coord_max instead of wrapping.
-    MORTON_HD constexpr void add_sat(unsigned d, coord_type k) {
-        coord_type cur = get(d);
-        coord_type room = coord_type(coord_max - cur);
-        set(d, (k > room) ? coord_max : coord_type(cur + k));
-    }
-
-    /// Subtract `k` from axis `d`, clamping at 0 instead of wrapping.
-    MORTON_HD constexpr void sub_sat(unsigned d, coord_type k) {
-        coord_type cur = get(d);
-        set(d, (k > cur) ? coord_type(0) : coord_type(cur - k));
-    }
-
-    /// Add `k` to axis `d` only if it does not overflow past coord_max.
-    /// Returns false (and leaves the code unchanged) if it would.
-    MORTON_HD constexpr bool try_add(unsigned d, coord_type k) {
-        coord_type cur = get(d);
-        if (k > coord_type(coord_max - cur)) return false;
-        set(d, coord_type(cur + k));
-        return true;
-    }
-
-    /// Subtract `k` from axis `d` only if it does not underflow past 0.
-    MORTON_HD constexpr bool try_sub(unsigned d, coord_type k) {
-        coord_type cur = get(d);
-        if (k > cur) return false;
-        set(d, coord_type(cur - k));
-        return true;
-    }
-
-    // ---- neighbour sets ----------------------------------------------------
-
-    /// The 2*Dim von Neumann (face) neighbours, ordered
-    /// {axis0-, axis0+, axis1-, axis1+, ...}. Wraps at the grid edge.
-    MORTON_HD constexpr std::array<Morton, 2 * Dim> face_neighbors() const {
-        std::array<Morton, 2 * Dim> out{};
-        for (unsigned d = 0; d < Dim; ++d) {
-            out[2 * d] = neighbor(d, -1);
-            out[2 * d + 1] = neighbor(d, +1);
-        }
-        return out;
-    }
-
-    /// The 3^Dim - 1 Moore neighbours (all cells differing by -1/0/+1 on each
-    /// axis, excluding self), in odometer order. Wraps at the grid edge.
-    MORTON_HD constexpr std::array<Morton, detail::pow3(Dim) - 1> all_neighbors() const {
-        std::array<Morton, detail::pow3(Dim) - 1> out{};
-        unsigned n = 0;
-        for (unsigned i = 0; i < detail::pow3(Dim); ++i) {
-            int off[Dim];
-            unsigned t = i;
-            bool zero = true;
-            for (unsigned d = 0; d < Dim; ++d) {
-                off[d] = int(t % 3) - 1;
-                if (off[d] != 0) zero = false;
-                t /= 3;
-            }
-            if (zero) continue;  // skip self
-            Morton m = *this;
-            for (unsigned d = 0; d < Dim; ++d) {
-                if (off[d] > 0)
-                    m.inc(d);
-                else if (off[d] < 0)
-                    m.dec(d);
-            }
-            out[n++] = m;
-        }
-        return out;
-    }
-
-    // ---- octree / hierarchy navigation ------------------------------------
-    //
-    // A cell at `level` covers a 2^level block per axis and has its low
-    // level*Dim code bits zero. These helpers express that hierarchy directly.
-
-    /// Ancestor cell origin at the given `level` (clears the low level*Dim
-    /// bits). level 0 is `*this`.
-    MORTON_HD constexpr Morton ancestor(unsigned level) const {
-        if (level * Dim >= code_bits) return Morton{};
-        code_type lowmask = (code_type(1) << (level * Dim)) - 1;
-        return from_code(code_ & ~lowmask);
-    }
-
-    /// Index (0 .. 2^Dim-1) of this cell within its parent at `level+1`,
-    /// i.e. the Dim interleaved bits just above the level boundary.
-    MORTON_HD constexpr unsigned child_index(unsigned level) const {
-        return unsigned((code_ >> (level * Dim)) & (octants - 1));
-    }
-
-    /// The `octant`-th child origin of a cell that is an ancestor at `level`
-    /// (i.e. set the Dim bits at position (level-1)*Dim). Requires level >= 1.
-    MORTON_HD constexpr Morton child(unsigned level, unsigned octant) const {
-        unsigned shift = (level - 1) * Dim;
-        code_type cleared = code_ & ~(code_type(octants - 1) << shift);
-        return from_code(cleared | (code_type(octant) << shift));
-    }
-
-    // ---- Z-order successor / predecessor ----------------------------------
-
-    MORTON_HD constexpr Morton& operator++() noexcept {
-        code_ = (code_ + 1) & field_mask;
-        return *this;
-    }
-    MORTON_HD constexpr Morton operator++(int) noexcept {
-        Morton t = *this;
-        ++*this;
-        return t;
-    }
-    MORTON_HD constexpr Morton& operator--() noexcept {
-        code_ = (code_ - 1) & field_mask;
-        return *this;
-    }
-    MORTON_HD constexpr Morton operator--(int) noexcept {
-        Morton t = *this;
-        --*this;
-        return t;
-    }
-
-    // ---- comparison (Z-order) ---------------------------------------------
-
-    friend MORTON_HD constexpr bool operator==(Morton a, Morton b) noexcept { return a.code_ == b.code_; }
-    friend MORTON_HD constexpr bool operator!=(Morton a, Morton b) noexcept { return a.code_ != b.code_; }
-    friend MORTON_HD constexpr bool operator<(Morton a, Morton b) noexcept { return a.code_ < b.code_; }
-    friend MORTON_HD constexpr bool operator<=(Morton a, Morton b) noexcept { return a.code_ <= b.code_; }
-    friend MORTON_HD constexpr bool operator>(Morton a, Morton b) noexcept { return a.code_ > b.code_; }
-    friend MORTON_HD constexpr bool operator>=(Morton a, Morton b) noexcept { return a.code_ >= b.code_; }
-
-    // ---- low-level deposit/extract ----------------------------------------
-
-    MORTON_HD static constexpr code_type deposit(coord_type x, unsigned d) {
-        if constexpr (code_bits <= 64) {
-            // PDEP is a host x86 instruction; never emit it in CUDA device code
-            // (where __CUDA_ARCH__ is defined), even if the host was -mbmi2.
+  MORTON_HD static constexpr code_type deposit(coord_type x, unsigned d) {
+    if constexpr (code_bits <= 64) {
+      // PDEP is a host x86 instruction; never emit it in CUDA device code
+      // (where __CUDA_ARCH__ is defined), even if the host was -mbmi2.
 #if defined(__BMI2__) && !defined(__CUDA_ARCH__)
-            if (!detail::is_consteval())
-                return code_type(_pdep_u64(std::uint64_t(x), std::uint64_t(axis_mask(d))));
+      if (!detail::is_consteval())
+        return code_type(_pdep_u64(std::uint64_t(x), std::uint64_t(axis_mask(d))));
 #elif MORTON_X86_RUNTIME_DISPATCH
-            // Single-binary path: use PDEP when the running CPU has BMI2.
-            if (!detail::is_consteval() && detail::cpu_has_bmi2())
-                return code_type(detail::pdep_u64_hw(std::uint64_t(x), std::uint64_t(axis_mask(d))));
+      // Single-binary path: use PDEP when the running CPU has BMI2.
+      if (!detail::is_consteval() && detail::cpu_has_bmi2())
+        return code_type(detail::pdep_u64_hw(std::uint64_t(x), std::uint64_t(axis_mask(d))));
 #endif
-        }
-        return detail::spread_sw<Dim, Bits, code_type, coord_type>(x, d);
     }
+    return detail::spread_sw<Dim, Bits, code_type, coord_type>(x, d);
+  }
 
-    MORTON_HD static constexpr coord_type extract(code_type c, unsigned d) {
-        if constexpr (code_bits <= 64) {
+  MORTON_HD static constexpr coord_type extract(code_type c, unsigned d) {
+    if constexpr (code_bits <= 64) {
 #if defined(__BMI2__) && !defined(__CUDA_ARCH__)
-            if (!detail::is_consteval())
-                return coord_type(_pext_u64(std::uint64_t(c), std::uint64_t(axis_mask(d))));
+      if (!detail::is_consteval())
+        return coord_type(_pext_u64(std::uint64_t(c), std::uint64_t(axis_mask(d))));
 #elif MORTON_X86_RUNTIME_DISPATCH
-            if (!detail::is_consteval() && detail::cpu_has_bmi2())
-                return coord_type(detail::pext_u64_hw(std::uint64_t(c), std::uint64_t(axis_mask(d))));
+      if (!detail::is_consteval() && detail::cpu_has_bmi2())
+        return coord_type(detail::pext_u64_hw(std::uint64_t(c), std::uint64_t(axis_mask(d))));
 #endif
-        }
-        return detail::compact_sw<Dim, Bits, code_type, coord_type>(c, d);
     }
+    return detail::compact_sw<Dim, Bits, code_type, coord_type>(c, d);
+  }
 
-    /// Mask of bits belonging to axis `d`.
-    MORTON_HD static constexpr code_type axis_mask(unsigned d) {
+  /// Mask of bits belonging to axis `d`.
+  MORTON_HD static constexpr code_type axis_mask(unsigned d) {
 #if defined(__CUDA_ARCH__)
-        // On device, compute the mask (avoids referencing the host static
-        // array from device code); it is a short compile-time-sized loop.
-        return detail::axis_mask<Dim, Bits, code_type>(d);
+    // On device, compute the mask (avoids referencing the host static
+    // array from device code); it is a short compile-time-sized loop.
+    return detail::axis_mask<Dim, Bits, code_type>(d);
 #else
-        return axis_masks_[d];
+    return axis_masks_[d];
 #endif
-    }
+  }
 
-private:
-    MORTON_HD static constexpr code_type M_complement(unsigned d) { return field_mask & ~axis_mask(d); }
-    MORTON_HD static constexpr code_type keep_mask(unsigned d) { return M_complement(d); }
-    MORTON_HD static constexpr code_type lsb(unsigned d) { return code_type(1) << d; }
+ private:
+  MORTON_HD static constexpr code_type M_complement(unsigned d) {
+    return field_mask & ~axis_mask(d);
+  }
+  MORTON_HD static constexpr code_type keep_mask(unsigned d) { return M_complement(d); }
+  MORTON_HD static constexpr code_type lsb(unsigned d) { return code_type(1) << d; }
 
-    MORTON_HD static constexpr std::array<code_type, Dim> make_masks() {
-        std::array<code_type, Dim> a{};
-        for (unsigned d = 0; d < Dim; ++d)
-            a[d] = detail::axis_mask<Dim, Bits, code_type>(d);
-        return a;
-    }
-    static constexpr std::array<code_type, Dim> axis_masks_ = make_masks();
+  MORTON_HD static constexpr std::array<code_type, Dim> make_masks() {
+    std::array<code_type, Dim> a{};
+    for (unsigned d = 0; d < Dim; ++d)
+      a[d] = detail::axis_mask<Dim, Bits, code_type>(d);
+    return a;
+  }
+  static constexpr std::array<code_type, Dim> axis_masks_ = make_masks();
 
-    code_type code_;
+  code_type code_;
 };
 
 // Convenient aliases for the common cases.

@@ -6,12 +6,12 @@
 /// operators as device-callable too. Without this, `wide_uint`'s arithmetic could not run inside a
 /// Kokkos kernel, which would break a device-resident Morton path for codes wider than 128 bits.
 ///
-/// When the Morton Kokkos backend is enabled and Kokkos is already in the translation unit, defer to
-/// Kokkos's own function marker: `KOKKOS_FUNCTION` resolves to the right host/device attributes for
-/// whichever backend (CUDA / HIP / OpenMP / Serial) Kokkos was built with — so the same code is
-/// callable from a Kokkos kernel on any backend. The raw `__CUDACC__`/`__HIPCC__` branch remains the
-/// fallback for a direct nvcc/hipcc compile without Kokkos; an ordinary host build expands it to
-/// nothing, leaving the CPU library byte-for-byte unchanged.
+/// When the Morton Kokkos backend is enabled and Kokkos is already in the translation unit, defer
+/// to Kokkos's own function marker: `KOKKOS_FUNCTION` resolves to the right host/device attributes
+/// for whichever backend (CUDA / HIP / OpenMP / Serial) Kokkos was built with — so the same code is
+/// callable from a Kokkos kernel on any backend. The raw `__CUDACC__`/`__HIPCC__` branch remains
+/// the fallback for a direct nvcc/hipcc compile without Kokkos; an ordinary host build expands it
+/// to nothing, leaving the CPU library byte-for-byte unchanged.
 ///
 /// SPDX-License-Identifier: MIT
 
