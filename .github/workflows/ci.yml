@@ -30,7 +30,7 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: >
           cmake -S . -B build
@@ -55,7 +55,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DMORTON_ENABLE_BMI2=${{ matrix.bmi2 }} -DMORTON_BUILD_BINDINGS=OFF
@@ -77,7 +77,7 @@ jobs:
     # sha256 below when it 404s. (The scalar reference path is fully covered by the cpp jobs above.)
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Intel SDE
         run: |
           set -euo pipefail
@@ -113,7 +113,7 @@ jobs:
       matrix:
         build_type: [Debug, Release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # MSVC has no __int128 and does not define __BMI2__, so the portable
       # software path is exercised here; CMake only adds -mbmi2 if supported.
       - run: cmake -S . -B build -DMORTON_BUILD_BINDINGS=OFF
@@ -130,7 +130,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python: ["3.9", "3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -146,7 +146,7 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y doxygen
       - run: doxygen docs/Doxyfile
       - uses: actions/upload-artifact@v4
