@@ -1,7 +1,7 @@
 # morton-arithmetic
 
 [![PyPI version](https://img.shields.io/pypi/v/peclet-morton.svg)](https://pypi.org/project/peclet-morton/)
-[![Python versions](https://img.shields.io/pypi/pyversions/peclet-morton.svg)](https://pypi.org/project/peclet-morton/)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/peclet-morton/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132433.svg)](https://doi.org/10.5281/zenodo.21132433)
