@@ -15,7 +15,7 @@ name = "peclet-morton"
 version = "0.2.1"
 description = "peclet.morton — fast Morton (Z-order) codes with O(1) arithmetic, vectorised for NumPy"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@gmail.com" }]
@@ -49,7 +49,7 @@ testpaths = ["bindings/python/tests"]
 # Source installs (`pip install .`) default to BMI2 ON and are fast directly.
 # ---------------------------------------------------------------------------
 [tool.cibuildwheel]
-build = "cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*"
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
 skip = "*-musllinux_i686 *_i686 *-win32 pp*"
 build-frontend = "build"
 test-requires = ["pytest", "numpy"]
