@@ -41,3 +41,6 @@ GENERATE_LATEX         = NO
 GENERATE_TREEVIEW      = YES
 HTML_OUTPUT            = html
 SORT_MEMBER_DOCS       = NO
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+HTML_COLORSTYLE        = LIGHT
