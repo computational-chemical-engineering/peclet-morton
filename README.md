@@ -186,14 +186,12 @@ cmake/               CMake package-config template (find_package(morton))
 .github/workflows/   ci.yml (build matrix) + release.yml (PyPI wheels on tag)
 docs/                EVALUATION.md, ROADMAP.md, HILBERT_GPU_NOTES.md, Doxyfile
 octree/              sibling project: linear octree on this library (being split out)
-legacy/              the original arbitrary-width BitArray + octree prototype
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```
 
-The `legacy/` directory holds the project's original prototype: an
-arbitrary-width `BitArray`, a wide-code `Morton`, and an octree built on it. The
-new core supersedes it for codes that fit in 64 bits; see the roadmap for how
-the octree could be ported.
+The project's original prototype (an arbitrary-width `BitArray`, a wide-code
+`Morton`, and an octree built on it) is no longer in the tree; it is reachable at
+the `pre-legacy-removal` git tag.
 
 ## License
 

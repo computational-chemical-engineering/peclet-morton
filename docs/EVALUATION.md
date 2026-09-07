@@ -36,8 +36,8 @@ least the 1990s:
   Trees"* (1981) — the LITMAX/BIGMIN algorithm used for the Z-order range
   iterator.
 
-The legacy prototype in `legacy/` already used the carry-propagation idea (on an
-arbitrary-width bit array). What this library adds over that prototype is making
+The project's original prototype (git tag `pre-legacy-removal`) already used the
+carry-propagation idea (on an arbitrary-width bit array). What this library adds over that prototype is making
 it **fast** (single-word, BMI2, branchless, O(1) instead of O(width) ripple loops)
 and **general** (any `Dim`, any `Bits ≤ 64`, both 2D and 3D, software fallback).
 

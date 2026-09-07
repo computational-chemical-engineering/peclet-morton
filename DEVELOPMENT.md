@@ -163,4 +163,4 @@ the default GitHub Actions matrix (the OpenMP backend is exercisable anywhere).
 See the "Repository layout" section of [README.md](README.md). In short:
 `include/morton/` is the library (incl. the `kokkos.hpp` GPU backend); `tests/`
 (with `tests/kokkos/`), `benchmarks/`, `bindings/python/`, `octree/` (sibling
-project), `docs/`, `packaging/`, `legacy/`.
+project), `docs/`, `packaging/`.

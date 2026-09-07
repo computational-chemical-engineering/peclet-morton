@@ -40,8 +40,9 @@ substrate; it is **not** yet a finished octree.
    `(code, cell)` (better cache behaviour, `std::lower_bound` lookups) vs a hash
    map. The arithmetic layer is storage-agnostic.
 7. **Serialization / interop.** Dump leaves as `(origin, level, value)` or
-   bounding boxes (the legacy `temp.dat` + matplotlib notebook workflow lives in
-   `../legacy/octree_visualize.ipynb`).
+   bounding boxes (the original prototype's `temp.dat` + matplotlib notebook
+   workflow is at the morton git tag `pre-legacy-removal`,
+   `legacy/octree_visualize.ipynb`).
 8. **Tests & docs** mirroring the morton library's standards (brute-force
    validation, CI, Doxygen).
 
@@ -53,9 +54,10 @@ substrate; it is **not** yet a finished octree.
 - Lets the octree iterate on its own release cadence while pinning a morton
   version.
 
-## Relationship to `../legacy/`
+## Relationship to the original prototype
 
-`../legacy/octree.hpp` is the original arbitrary-width-BitArray octree prototype
-(with the half-finished `balanceTree` and face detection). It is the reference
+The original arbitrary-width-BitArray octree prototype (`legacy/octree.hpp`, with
+the half-finished `balanceTree` and face detection) was removed from the morton
+tree and is reachable at its `pre-legacy-removal` git tag. It is the reference
 for features to port; this project re-implements them on the fast fixed-width
 morton core.

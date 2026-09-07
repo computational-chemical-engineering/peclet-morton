@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A header-only **C++17** library for Morton (Z-order) codes whose distinguishing feature is **arithmetic directly in Morton space** — incrementing/adding along a single axis, neighbour finding, and Z-order stepping without the usual `decode → modify → re-encode` round trip. The original prototype (an arbitrary-width `BitArray`, a wide-code `Morton`, and an octree) lives in `legacy/`; the new fast core supersedes it for codes that fit in 64 bits.
+A header-only **C++17** library for Morton (Z-order) codes whose distinguishing feature is **arithmetic directly in Morton space** — incrementing/adding along a single axis, neighbour finding, and Z-order stepping without the usual `decode → modify → re-encode` round trip. (The original prototype — an arbitrary-width `BitArray`, a wide-code `Morton` and an octree — was removed from the tree; it is reachable at the `pre-legacy-removal` git tag.)
 
 Read `docs/EVALUATION.md` for the honest assessment of what this contributes versus libmorton/morton-nd, and `docs/ROADMAP.md` for the plan.
 
@@ -98,7 +98,7 @@ Build: opt-in with `-DMORTON_ENABLE_KOKKOS=ON` + `find_package(Kokkos CONFIG)` a
 
 ### Octree → sibling `octree/` project
 
-The octree is **no longer part of this library**. It moved to `octree/` (`morton_octree::Octree`, `octree/include/morton_octree/octree.hpp`), a separate project that depends on `morton::morton`. See `octree/PLAN.md`. `legacy/octree.hpp` remains the original prototype/reference.
+The octree is **no longer part of this library**. It moved to `octree/` (`morton_octree::Octree`, `octree/include/morton_octree/octree.hpp`), a separate project that depends on `morton::morton`. See `octree/PLAN.md`.
 
 ## Packaging / distribution
 
@@ -113,6 +113,6 @@ The octree is **no longer part of this library**. It moved to `octree/` (`morton
 - `third_party/` vendors `doctest.h` and `libmorton/` purely for tests/benchmarks; they are not part of the shipped library.
 - Python bindings are deliberately dependency-free: a C ABI shim (`bindings/morton_c.cpp`, `extern "C"`, bulk array functions) + a `ctypes` wrapper. Supported configs are `(2,32) (2,16) (3,21) (3,16)`; adding one means adding a `DEFINE_2D/3D` instantiation *and* an entry in `_CONFIG` in `__init__.py`.
 
-## Legacy (`legacy/`)
+## History
 
-`legacy/octree.hpp` (linear octree over a `std::map<Morton,Cell>`), `legacy/morton.hpp` (CRTP `Morton` over arbitrary-width `BitArrayBase`), `legacy/bitarray.hpp`. These require **C++20** (`<bit>` `std::countr_zero`, fold expressions) and have no build target; the octree visualization notebook is `legacy/octree_visualize.ipynb` (dumps `llx lly urx ury` rows to `temp.dat`, plots with matplotlib). Porting the octree onto the new core is a roadmap item.
+The original prototype (`legacy/`: a linear octree over a `std::map<Morton,Cell>`, a CRTP `Morton` over an arbitrary-width `BitArrayBase`, and its matplotlib visualisation notebook) required C++20 and had no build target; it was deleted from the tree and is reachable at the `pre-legacy-removal` git tag. The raw-CUDA backend is at `pre-cuda-retirement`.
