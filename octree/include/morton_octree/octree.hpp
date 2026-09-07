@@ -1,6 +1,6 @@
 // morton_octree/octree.hpp
 //
-// A linear octree/quadtree built on the morton-arithmetic library. Leaves are
+// A linear octree/quadtree built on the peclet-morton library. Leaves are
 // stored in a std::map keyed by their Morton origin, so the map is already in
 // Z-order. Point location, neighbour finding and refinement are expressed with
 // the core's O(1) arithmetic and hierarchy helpers rather than decode/encode.

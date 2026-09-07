@@ -1,10 +1,14 @@
-# Root build configuration for the `mortonarith` Python wheel.
+# Root build configuration for the `peclet-morton` wheel (import peclet.morton).
 #
 # Uses scikit-build-core: `pip install .` invokes CMake in MORTON_WHEEL mode,
-# which compiles the C-ABI extension (bindings/morton_c.cpp) and installs the
-# shared library into the `mortonarith` package. Because the whole repository
+# which compiles the C-ABI shared library (bindings/morton_c.h + morton_c.cpp)
+# and installs it into the `peclet/morton` package. Because the whole repository
 # is the source tree, the build is self-contained (the C++ headers in include/
 # and bindings/ are available during an isolated build).
+#
+# `version` below is THE version of this repo: CMakeLists.txt reads it, and
+# tools/release/check_release_state.sh checks the Doxyfile, CITATION.cff and
+# packaging/vcpkg/morton/vcpkg.json against it.
 
 [build-system]
 requires = ["scikit-build-core>=0.5", "numpy>=1.20"]
@@ -31,7 +35,7 @@ cmake.version = ">=3.16"
 cmake.args = ["-DMORTON_WHEEL=ON"]
 # Copy the peclet namespace dir (contains morton/) into the wheel; no peclet/__init__.py
 # so `peclet` stays an implicit PEP-420 namespace shared with the other peclet-* packages.
-# CMake installs the built libmortonarith_c.so into peclet/morton/ alongside it.
+# CMake installs the built libpeclet_morton_c.so into peclet/morton/ alongside it.
 wheel.packages = ["bindings/python/peclet"]
 sdist.include = ["include", "bindings", "CMakeLists.txt", "LICENSE"]
 

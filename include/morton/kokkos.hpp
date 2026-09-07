@@ -1,5 +1,5 @@
 /// @file kokkos.hpp
-/// @brief Portable Kokkos backend for the morton-arithmetic library.
+/// @brief Portable Kokkos backend for the peclet-morton library.
 ///
 /// The per-element work is the ordinary `Morton<Dim,Bits>` code path (marked
 /// `MORTON_HD`, which resolves to `KOKKOS_FUNCTION` once Kokkos is in the

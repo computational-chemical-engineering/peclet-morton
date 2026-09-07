@@ -2,12 +2,20 @@
 
 Where this library stands and what to do with it.
 
-## Status today (v0.3)
+## Status today
 
-The v0.1 core plus the entire near/medium-term roadmap below is now
-**implemented and tested** (26 doctest cases, ~1.4M assertions; pytest; CI; docs);
-the v0.2→v0.3 additions (wide codes, packaging, release pipeline, octree split)
-are listed in "Done since v0.2" further down:
+Everything on the original near/medium-term roadmap is **implemented, tested and
+released** on PyPI as `peclet-morton` (29 doctest cases, ~1.4M assertions; pytest
+over the NumPy bindings; CI incl. Intel SDE runs of the AVX-512 and
+runtime-dispatch paths; Doxygen). The current version is the `version` line of
+`pyproject.toml` (the single version source), the last release is the newest
+`v*` git tag, and the PyPI badge on the README shows what is published. The next
+release is the peclet family's clean-break 1.0.0 (see `../docs/QUALITY_PLAN.md`
+in the suite). The one part that is *not* finished is the `octree/` sibling
+scaffold (4 tests, no 2:1 balancing, no cross-level neighbours — see
+`../octree/PLAN.md`).
+
+What is in:
 
 - Header-only C++17 core (`Morton<Dim, Bits>`): BMI2 encode/decode with portable
   software fallback; O(1) per-axis `inc/dec/add/sub`, `neighbor`, `set`, Z-order
@@ -42,7 +50,7 @@ are listed in "Done since v0.2" further down:
   (`benchmarks/bench_batch.cpp`) confirms ~1.7× over scalar when cache-resident
   and memory-bound parity out of cache — exactly the predicted behaviour.
 
-## Done since v0.2
+## Also in (wide codes, packaging, GPU)
 
 - ✅ **Codes > 128 bits** — `morton/wide_uint.hpp` provides a fixed-width
   word-array unsigned (`+ - & | ^ ~ << >>`, comparisons) so `Morton<Dim,Bits>`
@@ -69,7 +77,7 @@ are listed in "Done since v0.2" further down:
   CPU core); one-shot host calls are PCIe-bound (documented). Replaced the
   original raw-CUDA backend (`cuda/`, retired — `pre-cuda-retirement` git tag).
 
-## Done since v0.3
+## Also in (single portable binary)
 
 - ✅ **Runtime BMI2 dispatch** — `MORTON_ENABLE_RUNTIME_DISPATCH` (CMake option /
   compile define) builds a single binary *without* `-mbmi2` that still uses

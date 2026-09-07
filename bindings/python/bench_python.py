@@ -1,7 +1,7 @@
 """Python-side benchmark: vectorised Morton arithmetic vs the decode/encode
 round trip, both over NumPy arrays. Run after building the native library:
 
-    cmake -S . -B build && cmake --build build --target mortonarith_c
+    cmake -S . -B build && cmake --build build --target peclet_morton_c
     PYTHONPATH=bindings/python python3 bindings/python/bench_python.py
 """
 import time

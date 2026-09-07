@@ -1,4 +1,4 @@
-# vcpkg port for the header-only morton-arithmetic library.
+# vcpkg port for the header-only peclet-morton library.
 #
 # Before submitting to the vcpkg registry, set REF to the release tag and fill
 # SHA512 with the value reported by `vcpkg install morton` on first attempt
@@ -6,8 +6,8 @@
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO computational-chemical-engineering/morton_artithmetic
-    REF v0.1.0
+    REPO computational-chemical-engineering/peclet-morton
+    REF v0.2.1
     SHA512 0
     HEAD_REF main
 )

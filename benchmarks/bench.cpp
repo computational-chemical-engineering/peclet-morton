@@ -1,4 +1,4 @@
-// Micro-benchmarks for the morton-arithmetic library.
+// Micro-benchmarks for the peclet-morton library.
 //
 // The headline comparison is "walk to the neighbouring cell": doing it with
 // the library's O(1) axis arithmetic versus the conventional

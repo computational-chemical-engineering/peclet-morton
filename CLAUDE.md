@@ -45,7 +45,7 @@ ctest --test-dir build_kokkos -R morton_kokkos_tests --output-on-failure
 pip install .                                     # builds extension, bundles .so
 python -m pytest bindings/python/tests -q
 # or dev loop without installing:
-cmake --build build --target mortonarith_c        # drops .so into bindings/python/peclet/morton/
+cmake --build build --target peclet_morton_c      # drops .so into bindings/python/peclet/morton/
 PYTHONPATH=bindings/python python3 -m pytest bindings/python/tests -q
 ```
 
@@ -63,7 +63,7 @@ out into the sibling `octree/` subproject — see below — and is no longer a c
 Interleaves `Dim` coordinates of `Bits` bits each. `Dim*Bits <= 64` uses a built-in `code_type`; **65–128 bits use `__uint128_t`** (guarded by `MORTON_HAS_INT128` / `__SIZEOF_INT128__`), so `Morton3D32` (96-bit) and `Morton2D64` (128-bit) work. Key design points:
 
 - **Encode/decode** go through `deposit`/`extract`. For `code_bits <= 64` they use BMI2 `_pdep_u64`/`_pext_u64` under `#if defined(__BMI2__)`, else a software fallback (`detail::spread_sw`/`compact_sw`). For `code_bits > 64` the software path is always used (PDEP is 64-bit only). Paths are cross-checked in tests; the BMI2=OFF build verifies the fallback emits no pdep/pext.
-- **Runtime dispatch** (`MORTON_ENABLE_RUNTIME_DISPATCH`, opt-in via the CMake option / compile define; gated to `MORTON_X86_RUNTIME_DISPATCH` on x86-64 GCC/Clang when `-mbmi2` is *not* set): a third `deposit`/`extract` branch calls `detail::pdep_u64_hw`/`pext_u64_hw` — `__attribute__((target("bmi2")))` helpers, so PDEP is emitted without a global `-mbmi2` — guarded by the cached `detail::cpu_has_bmi2()` (`__builtin_cpu_supports`). This yields one portable binary that's BMI2-fast at runtime. **Don't enable it by default for the plain BMI2=OFF build** — that build is contractually pdep-free (a test greps for it). It self-disables under `-mbmi2`/CUDA/non-x86. `MORTON_X86` / `cpu_has_bmi2`/`cpu_has_avx2`/`cpu_has_avx512f` live in `detail` and are shared with the SIMD path.
+- **Runtime dispatch** (`MORTON_ENABLE_RUNTIME_DISPATCH`, opt-in via the CMake option / compile define; gated to `MORTON_X86_RUNTIME_DISPATCH` on x86-64 GCC/Clang when `-mbmi2` is *not* set): a third `deposit`/`extract` branch calls `detail::pdep_u64_hw`/`pext_u64_hw` — `__attribute__((target("bmi2")))` helpers, so PDEP is emitted without a global `-mbmi2` — guarded by the cached `detail::cpu_has_bmi2()` (`__builtin_cpu_supports`). This yields one portable binary that's BMI2-fast at runtime. **Don't enable it by default for the plain BMI2=OFF build** — that build is contractually pdep-free (the `morton_no_pdep_pext` ctest disassembles the test binary and fails on any pdep/pext). It self-disables under `-mbmi2`/CUDA/non-x86. `MORTON_X86` / `cpu_has_bmi2`/`cpu_has_avx2`/`cpu_has_avx512f` live in `detail` and are shared with the SIMD path.
 - **`constexpr`**: `deposit`/`extract`/`encode`/`decode`/arithmetic are `constexpr`. They call the BMI2 intrinsic only when `!detail::is_consteval()` (which uses `__builtin_is_constant_evaluated()`, available at C++17 on GCC/Clang); in constant evaluation the software path runs. Don't "simplify" by removing the `is_consteval()` guard — the intrinsics aren't constexpr.
 - **The headline arithmetic** (`add`/`sub`/`inc`/`dec`/`neighbor`, O(1), branchless) operates on one axis' interleaved bits: to add to axis `d`, fill non-axis bits with 1s (`code | ~M`) so carries ripple across the gaps, add the dilated increment, keep only axis `d` (`& M`), OR back the others. **Wraps mod `2^Bits` per axis.** `add_sat`/`sub_sat`/`try_add`/`try_sub` are the non-wrapping variants.
 - **Neighbour/hierarchy helpers**: `face_neighbors()` (2·Dim, von Neumann), `all_neighbors()` (`3^Dim-1`, Moore), `ancestor(level)`/`child(level,oct)`/`child_index(level)` for octree navigation.
@@ -102,7 +102,8 @@ The octree is **no longer part of this library**. It moved to `octree/` (`morton
 
 ## Packaging / distribution
 
-- **CMake**: `install` exports a package config (`cmake/morton-config.cmake.in` → `find_package(morton CONFIG)` → `morton::morton`). The `-mbmi2` interface flag is guarded by `$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>` so it's safe to propagate to consumers.
+- **Version**: `pyproject.toml` `version` is the single source; `CMakeLists.txt` reads it into `project(peclet_morton VERSION …)` (so the package-config version file follows), `conanfile.py` reads it in `set_version()`, and `packaging/vcpkg/morton/vcpkg.json` / `docs/Doxyfile` / `CITATION.cff` are checked against it by `../tools/release/check_release_state.sh`.
+- **CMake**: `install` exports a package config (`cmake/morton-config.cmake.in` → `find_package(morton CONFIG)` → `morton::morton`). The package name `morton` and the target `morton::morton` are the stable consumer-facing names (the CMake *project* is `peclet_morton`). The `-mbmi2` interface flag is guarded by `$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>` so it's safe to propagate to consumers.
 - **Conan** `conanfile.py`, **vcpkg** `packaging/vcpkg/morton/` (set REF/SHA512 at release).
 - **Python wheels**: `.github/workflows/release.yml` + cibuildwheel build with `MORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON` (via `CMAKE_ARGS`) — no global `-mbmi2` (so no SIGILL on old CPUs) but PDEP/PEXT and the AVX-512 batch kernels still kick in at runtime via `target`-attribute helpers + CPUID. One wheel, portable *and* fast. (On MSVC/non-x86 the dispatch self-disables → software path.) Source `pip install .` stays BMI2-on. The C ABI shim (`bindings/morton_c.cpp`) routes 64-bit-code configs through `batch::` so Python gets the dispatched paths; `(2,16)` (32-bit code) keeps the per-element path.
 
@@ -111,7 +112,7 @@ The octree is **no longer part of this library**. It moved to `octree/` (`morton
 - Everything is templated on compile-time `Dim` and `Bits`; that is what makes masks/shifts free. Don't add runtime dimension/bit-width to the hot path.
 - The arithmetic advantage is for **scattered/data-dependent neighbour access**, not dense sweeps — keep this framing in docs and benchmarks. Don't market the library as a faster encoder; it is at parity with libmorton on encode/decode.
 - `third_party/` vendors `doctest.h` and `libmorton/` purely for tests/benchmarks; they are not part of the shipped library.
-- Python bindings are deliberately dependency-free: a C ABI shim (`bindings/morton_c.cpp`, `extern "C"`, bulk array functions) + a `ctypes` wrapper. Supported configs are `(2,32) (2,16) (3,21) (3,16)`; adding one means adding a `DEFINE_2D/3D` instantiation *and* an entry in `_CONFIG` in `__init__.py`.
+- Python bindings are deliberately dependency-free: a C ABI (`bindings/morton_c.h` declares the `peclet_morton_*` exports via `PECLET_MORTON_C_DECLARE_2D/3D`; `bindings/morton_c.cpp` includes it and defines them with the mirrored `DEFINE_2D/3D`, so a signature drift is a compile error) built as `libpeclet_morton_c` + a `ctypes` wrapper. Supported configs are `(2,32) (2,16) (3,21) (3,16)`; adding one means one `PECLET_MORTON_C_DECLARE_*` line in the header, one `DEFINE_*` line in the .cpp *and* an entry in `_CONFIG` in `__init__.py`. The header + library are installed beside the headers by `cmake --install` when `MORTON_BUILD_BINDINGS` is on (not part of the `morton::` export set).
 
 ## History
 

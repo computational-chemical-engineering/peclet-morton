@@ -1,7 +1,7 @@
 # morton-octree — project plan
 
 This directory is the seed of a **separate project**, split out from the
-morton-arithmetic library. The morton library should stay a small, focused
+peclet-morton library. The morton library should stay a small, focused
 primitive (encode/decode + Z-order arithmetic + range search); a full octree is
 a different concern with its own data-structure and numerics decisions, so it
 lives — and will eventually ship — on its own.

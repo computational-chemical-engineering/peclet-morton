@@ -1,7 +1,6 @@
-// C ABI shim exposing the morton-arithmetic library to other languages
-// (used by the ctypes-based Python package). All functions operate on whole
-// arrays so the per-element Python overhead is amortised away and NumPy gets
-// near-native throughput.
+// C ABI of peclet-morton (libpeclet_morton_c): the definitions of the functions declared in
+// morton_c.h, used by the ctypes-based Python package. All functions operate on whole arrays so
+// the per-element Python overhead is amortised away and NumPy gets near-native throughput.
 //
 // The bulk encode/decode/add/sub go through morton::batch, which dispatches to
 // AVX-512 (and runtime BMI2) on a capable CPU and the auto-vectorised scalar
@@ -19,6 +18,7 @@
 #include "morton/batch.hpp"
 #include "morton/iterate.hpp"
 #include "morton/morton.hpp"
+#include "morton_c.h"  // the declarations; a signature mismatch below is a compile error
 
 using morton::Morton;
 
@@ -184,29 +184,27 @@ inline void allneigh_(const std::uint64_t* code, std::uint64_t* out, std::size_t
 
 }  // namespace
 
-#if defined(_WIN32)
-#define API extern "C" __declspec(dllexport)  // MSVC: export from the DLL for ctypes
-#else
-#define API extern "C" __attribute__((visibility("default")))
-#endif
+// Definitions carry the same linkage/visibility as the declarations in morton_c.h
+// (PECLET_MORTON_C_BUILD, set by the build, makes PECLET_MORTON_C_API dllexport on Windows).
+#define API extern "C" PECLET_MORTON_C_API
 
 // ---------------------------------------------------------------------------
 // 2D configurations
 // ---------------------------------------------------------------------------
 #define DEFINE_2D(SUFFIX, BITS, COORD)                                                             \
-  API void mortonarith_encode2_##SUFFIX(const COORD* x, const COORD* y, std::uint64_t* out,        \
+  API void peclet_morton_encode2_##SUFFIX(const COORD* x, const COORD* y, std::uint64_t* out,        \
                                         std::size_t n) {                                           \
     enc2<BITS>(x, y, out, n);                                                                      \
   }                                                                                                \
-  API void mortonarith_decode2_##SUFFIX(const std::uint64_t* code, COORD* x, COORD* y,             \
+  API void peclet_morton_decode2_##SUFFIX(const std::uint64_t* code, COORD* x, COORD* y,             \
                                         std::size_t n) {                                           \
     dec2<BITS>(code, x, y, n);                                                                     \
   }                                                                                                \
-  API void mortonarith_add2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out, std::size_t n, \
+  API void peclet_morton_add2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out, std::size_t n, \
                                      unsigned axis, std::int64_t k) {                              \
     add2<BITS>(code, out, n, axis, k);                                                             \
   }                                                                                                \
-  API std::uint64_t mortonarith_box_count2_##SUFFIX(const COORD* lo, const COORD* hi) {            \
+  API std::uint64_t peclet_morton_box_count2_##SUFFIX(const COORD* lo, const COORD* hi) {            \
     std::uint64_t c = 1;                                                                           \
     for (int d = 0; d < 2; ++d) {                                                                  \
       if (hi[d] < lo[d])                                                                           \
@@ -215,27 +213,27 @@ inline void allneigh_(const std::uint64_t* code, std::uint64_t* out, std::size_t
     }                                                                                              \
     return c;                                                                                      \
   }                                                                                                \
-  API void mortonarith_box_zorder2_##SUFFIX(const COORD* lo, const COORD* hi,                      \
+  API void peclet_morton_box_zorder2_##SUFFIX(const COORD* lo, const COORD* hi,                      \
                                             std::uint64_t* out) {                                  \
     using M = Morton<2, BITS>;                                                                     \
     std::array<COORD, 2> a{lo[0], lo[1]}, b{hi[0], hi[1]};                                         \
     std::size_t i = 0;                                                                             \
     morton::for_each_in_box_zorder<2, BITS>(a, b, [&](M m) { out[i++] = m.code(); });              \
   }                                                                                                \
-  API void mortonarith_addsat2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
+  API void peclet_morton_addsat2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
                                         std::size_t n, unsigned axis, std::int64_t k) {            \
     addsat_<2, BITS>(code, out, n, axis, k);                                                       \
   }                                                                                                \
-  API void mortonarith_tryadd2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
+  API void peclet_morton_tryadd2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
                                         std::uint8_t* ok, std::size_t n, unsigned axis,            \
                                         std::int64_t k) {                                          \
     tryadd_<2, BITS>(code, out, ok, n, axis, k);                                                   \
   }                                                                                                \
-  API void mortonarith_faceneighbors2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,      \
+  API void peclet_morton_faceneighbors2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,      \
                                                std::size_t n) {                                    \
     faceneigh_<2, BITS>(code, out, n);                                                             \
   }                                                                                                \
-  API void mortonarith_allneighbors2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,       \
+  API void peclet_morton_allneighbors2_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,       \
                                               std::size_t n) {                                     \
     allneigh_<2, BITS>(code, out, n);                                                              \
   }
@@ -247,19 +245,19 @@ DEFINE_2D(u16, 16, std::uint16_t)
 // 3D configurations
 // ---------------------------------------------------------------------------
 #define DEFINE_3D(SUFFIX, BITS, COORD)                                                             \
-  API void mortonarith_encode3_##SUFFIX(const COORD* x, const COORD* y, const COORD* z,            \
+  API void peclet_morton_encode3_##SUFFIX(const COORD* x, const COORD* y, const COORD* z,            \
                                         std::uint64_t* out, std::size_t n) {                       \
     enc3<BITS>(x, y, z, out, n);                                                                   \
   }                                                                                                \
-  API void mortonarith_decode3_##SUFFIX(const std::uint64_t* code, COORD* x, COORD* y, COORD* z,   \
+  API void peclet_morton_decode3_##SUFFIX(const std::uint64_t* code, COORD* x, COORD* y, COORD* z,   \
                                         std::size_t n) {                                           \
     dec3<BITS>(code, x, y, z, n);                                                                  \
   }                                                                                                \
-  API void mortonarith_add3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out, std::size_t n, \
+  API void peclet_morton_add3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out, std::size_t n, \
                                      unsigned axis, std::int64_t k) {                              \
     add3<BITS>(code, out, n, axis, k);                                                             \
   }                                                                                                \
-  API std::uint64_t mortonarith_box_count3_##SUFFIX(const COORD* lo, const COORD* hi) {            \
+  API std::uint64_t peclet_morton_box_count3_##SUFFIX(const COORD* lo, const COORD* hi) {            \
     std::uint64_t c = 1;                                                                           \
     for (int d = 0; d < 3; ++d) {                                                                  \
       if (hi[d] < lo[d])                                                                           \
@@ -268,27 +266,27 @@ DEFINE_2D(u16, 16, std::uint16_t)
     }                                                                                              \
     return c;                                                                                      \
   }                                                                                                \
-  API void mortonarith_box_zorder3_##SUFFIX(const COORD* lo, const COORD* hi,                      \
+  API void peclet_morton_box_zorder3_##SUFFIX(const COORD* lo, const COORD* hi,                      \
                                             std::uint64_t* out) {                                  \
     using M = Morton<3, BITS>;                                                                     \
     std::array<COORD, 3> a{lo[0], lo[1], lo[2]}, b{hi[0], hi[1], hi[2]};                           \
     std::size_t i = 0;                                                                             \
     morton::for_each_in_box_zorder<3, BITS>(a, b, [&](M m) { out[i++] = m.code(); });              \
   }                                                                                                \
-  API void mortonarith_addsat3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
+  API void peclet_morton_addsat3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
                                         std::size_t n, unsigned axis, std::int64_t k) {            \
     addsat_<3, BITS>(code, out, n, axis, k);                                                       \
   }                                                                                                \
-  API void mortonarith_tryadd3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
+  API void peclet_morton_tryadd3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,             \
                                         std::uint8_t* ok, std::size_t n, unsigned axis,            \
                                         std::int64_t k) {                                          \
     tryadd_<3, BITS>(code, out, ok, n, axis, k);                                                   \
   }                                                                                                \
-  API void mortonarith_faceneighbors3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,      \
+  API void peclet_morton_faceneighbors3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,      \
                                                std::size_t n) {                                    \
     faceneigh_<3, BITS>(code, out, n);                                                             \
   }                                                                                                \
-  API void mortonarith_allneighbors3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,       \
+  API void peclet_morton_allneighbors3_##SUFFIX(const std::uint64_t* code, std::uint64_t* out,       \
                                               std::size_t n) {                                     \
     allneigh_<3, BITS>(code, out, n);                                                              \
   }

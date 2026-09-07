@@ -19,9 +19,8 @@ and libmorton for tests/benchmarks only.
 ## C++ core
 
 ```bash
-git clone -b morton-arith-library \
-  git@github.com:computational-chemical-engineering/morton_artithmetic.git
-cd morton_artithmetic
+git clone git@github.com:computational-chemical-engineering/peclet-morton.git
+cd peclet-morton
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
@@ -101,7 +100,7 @@ python -m pytest bindings/python/tests -q
 Dev loop without installing:
 
 ```bash
-cmake --build build --target mortonarith_c     # drops .so into bindings/python/mortonarith/
+cmake --build build --target peclet_morton_c   # drops .so into bindings/python/peclet/morton/
 PYTHONPATH=bindings/python python -m pytest bindings/python/tests -q
 ```
 
@@ -113,7 +112,7 @@ CPU without BMI2. Source installs keep BMI2 on.
 
 ```cmake
 # vendored:
-add_subdirectory(morton_arithmetic)
+add_subdirectory(morton)   # this repo
 target_link_libraries(app PRIVATE morton::morton)
 
 # installed (cmake --install build --prefix <p>):

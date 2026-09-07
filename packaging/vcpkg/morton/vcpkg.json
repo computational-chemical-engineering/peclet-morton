@@ -1,8 +1,9 @@
 {
+  "$comment": "version must equal `version` in the repo's pyproject.toml (the single version source); tools/release/check_release_state.sh greps it. Bump both at release time.",
   "name": "morton",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Fast Morton (Z-order) codes with O(1) arithmetic in Morton space",
-  "homepage": "https://github.com/computational-chemical-engineering/morton_artithmetic",
+  "homepage": "https://github.com/computational-chemical-engineering/peclet-morton",
   "license": "MIT",
   "dependencies": [
     { "name": "vcpkg-cmake", "host": true },

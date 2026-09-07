@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
-project(morton_arithmetic VERSION 0.1.0 LANGUAGES CXX)
+
+# pyproject.toml is the single version source (QUALITY_PLAN D4): `version = "X.Y.Z"` under
+# [project]. Everything else (this project(), the package-config version file, the Doxyfile,
+# CITATION.cff, the vcpkg manifest) either reads it or is checked against it by
+# tools/release/check_release_state.sh.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" _peclet_morton_version_line
+     REGEX "^version[ \t]*=[ \t]*\"[0-9]+\.[0-9]+\.[0-9]+")
+string(REGEX REPLACE ".*\"([0-9]+\.[0-9]+\.[0-9]+)\".*" "\\1"
+       PECLET_MORTON_VERSION "${_peclet_morton_version_line}")
+if(NOT PECLET_MORTON_VERSION MATCHES "^[0-9]+\.[0-9]+\.[0-9]+$")
+    message(FATAL_ERROR "could not read `version = \"X.Y.Z\"` from pyproject.toml (got '${_peclet_morton_version_line}')")
+endif()
+
+project(peclet_morton VERSION ${PECLET_MORTON_VERSION} LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
 # Header-only interface library
@@ -53,7 +66,7 @@ option(MORTON_WHEEL "Build only the Python extension for a wheel" OFF)
 if(MORTON_WHEEL)
     add_subdirectory(bindings)
     # LIBRARY = .so/.dylib (Linux/macOS); RUNTIME = .dll (Windows — the actual loadable artifact for ctypes)
-    install(TARGETS mortonarith_c
+    install(TARGETS peclet_morton_c
             LIBRARY DESTINATION peclet/morton
             RUNTIME DESTINATION peclet/morton)
     return()
@@ -106,6 +119,17 @@ set(MORTON_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/morton)
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS morton EXPORT mortonTargets)
+
+# The C ABI (bindings/morton_c.h + libpeclet_morton_c) is installed beside the headers when the
+# bindings are built. It is a plain shared library for other languages (the Python package loads it
+# via ctypes), deliberately NOT part of the morton:: CMake export set.
+if(TARGET peclet_morton_c)
+    install(FILES bindings/morton_c.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/morton)
+    install(TARGETS peclet_morton_c
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 install(EXPORT mortonTargets
     FILE morton-targets.cmake
     NAMESPACE morton::

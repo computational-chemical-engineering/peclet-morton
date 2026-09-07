@@ -1,6 +1,6 @@
 # morton-octree
 
-A linear octree/quadtree built on the [morton-arithmetic](../README.md) library.
+A linear octree/quadtree built on the [peclet-morton](../README.md) library.
 
 > **Status: early scaffold.** This is being split out into its own project.
 > See [PLAN.md](PLAN.md) for the design and roadmap (2:1 balancing, cross-level

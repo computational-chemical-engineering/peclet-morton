@@ -1,21 +1,31 @@
+import os
+import re
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
 class MortonConan(ConanFile):
-    """Conan 2.x recipe for the header-only morton-arithmetic library."""
+    """Conan 2.x recipe for the header-only peclet-morton library."""
 
     name = "morton"
-    version = "0.1.0"
+    # version: read from pyproject.toml (the single version source) in set_version() below.
     license = "MIT"
     description = "Fast Morton (Z-order) codes with O(1) arithmetic"
-    homepage = "https://github.com/computational-chemical-engineering/morton_artithmetic"
+    homepage = "https://github.com/computational-chemical-engineering/peclet-morton"
     topics = ("morton", "z-order", "space-filling-curve", "octree", "header-only")
-    url = "https://github.com/computational-chemical-engineering/morton_artithmetic"
+    url = "https://github.com/computational-chemical-engineering/peclet-morton"
+
+    def set_version(self):
+        with open(os.path.join(self.recipe_folder, "pyproject.toml"), encoding="utf-8") as f:
+            m = re.search(r'^version\s*=\s*"([^"]+)"', f.read(), re.M)
+        if not m:
+            raise RuntimeError("pyproject.toml: no `version = \"X.Y.Z\"` line")
+        self.version = m.group(1)
 
     settings = "os", "arch", "compiler", "build_type"
     package_type = "header-library"
-    exports_sources = "include/*", "cmake/*", "CMakeLists.txt", "LICENSE", "README.md"
+    exports_sources = "include/*", "cmake/*", "CMakeLists.txt", "pyproject.toml", "LICENSE", "README.md"
     no_copy_source = True
 
     options = {"with_bmi2": [True, False]}

@@ -1,9 +1,9 @@
-# Doxygen configuration for the morton-arithmetic library.
+# Doxygen configuration for the peclet-morton library.
 # Generate docs with:   doxygen docs/Doxyfile
 # Output:               docs/doxygen/html/index.html
 
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = "morton-arithmetic"
+PROJECT_NAME           = "peclet-morton"
 PROJECT_NUMBER         = 0.2.1
 PROJECT_BRIEF          = "Fast Morton (Z-order) codes with O(1) arithmetic"
 OUTPUT_DIRECTORY       = docs/doxygen

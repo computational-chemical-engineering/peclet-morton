@@ -1,7 +1,7 @@
-# morton-arithmetic
+# peclet-morton
 
 [![PyPI version](https://img.shields.io/pypi/v/peclet-morton.svg)](https://pypi.org/project/peclet-morton/)
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/peclet-morton/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://pypi.org/project/peclet-morton/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/computational-chemical-engineering/peclet-morton/blob/main/LICENSE)
 [![CI](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet-morton/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132433.svg)](https://doi.org/10.5281/zenodo.21132433)
@@ -122,7 +122,7 @@ ctest --test-dir build --output-on-failure   # or: ./build/tests/morton_tests
 As a header-only dependency in another CMake project — either vendored:
 
 ```cmake
-add_subdirectory(morton_arithmetic)
+add_subdirectory(morton)          # this repo, e.g. as a submodule
 target_link_libraries(your_target PRIVATE morton::morton)
 ```
 
@@ -164,7 +164,7 @@ For a quick dev loop without installing, drop the `.so` next to the package and
 use `PYTHONPATH`:
 
 ```bash
-cmake --build build --target mortonarith_c
+cmake --build build --target peclet_morton_c
 PYTHONPATH=bindings/python python3 -m pytest bindings/python/tests -q
 ```
 
@@ -179,7 +179,8 @@ include/morton/      the library: morton.hpp, iterate.hpp, batch.hpp, simd.hpp,
 tests/               doctest suite (encode/decode, arithmetic, constexpr, wide,
                      neighbours, batch, iterate)
 benchmarks/          C++ micro-benchmarks (vs libmorton) + batch/SIMD benchmark
-bindings/python/     ctypes + NumPy wrapper and pytest tests
+bindings/            morton_c.h + morton_c.cpp: the C ABI (libpeclet_morton_c);
+                     python/: the ctypes + NumPy wrapper and its pytest tests
 pyproject.toml       scikit-build-core wheel build + cibuildwheel config
 conanfile.py         Conan recipe;  packaging/vcpkg/  vcpkg port
 cmake/               CMake package-config template (find_package(morton))

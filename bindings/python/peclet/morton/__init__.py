@@ -1,6 +1,7 @@
 """peclet.morton - fast Morton (Z-order) codes with arithmetic, for NumPy.
 
-This is a thin ``ctypes`` wrapper over the C++ ``morton`` library. Every
+This is a thin ``ctypes`` wrapper over the C ABI of the C++ ``morton`` library
+(``bindings/morton_c.h``, shared library ``libpeclet_morton_c``). Every
 operation is vectorised: it runs over whole NumPy arrays in compiled code, so
 there is no per-element Python overhead.
 
@@ -48,17 +49,17 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_library() -> ctypes.CDLL:
-    # Match the shared lib across platforms: libmortonarith_c.so / .dylib (Linux/macOS) and
-    # mortonarith_c.dll (Windows — no 'lib' prefix). Exclude MSVC import/aux files (.lib/.exp/.pdb).
+    # Match the shared lib across platforms: libpeclet_morton_c.so / .dylib (Linux/macOS) and
+    # peclet_morton_c.dll (Windows — no 'lib' prefix). Exclude MSVC import/aux files (.lib/.exp/.pdb).
     loadable = (".so", ".dylib", ".dll", ".pyd")
     candidates = [
-        p for p in glob.glob(os.path.join(_HERE, "*mortonarith_c*"))
+        p for p in glob.glob(os.path.join(_HERE, "*peclet_morton_c*"))
         if p.endswith(loadable) or ".so." in os.path.basename(p)
     ]
     if not candidates:
         raise ImportError(
-            "mortonarith native library not found. Build it first:\n"
-            "    cmake -S . -B build && cmake --build build --target mortonarith_c"
+            "peclet_morton_c native library not found. Build it first:\n"
+            "    cmake -S . -B build && cmake --build build --target peclet_morton_c"
         )
     return ctypes.CDLL(candidates[0])
 
@@ -104,7 +105,7 @@ def encode(*coords: np.ndarray, bits: int) -> np.ndarray:
         if a.size != n:
             raise ValueError("coordinate arrays must have the same length")
     out = np.empty(n, dtype=np.uint64)
-    fn = getattr(_lib, f"mortonarith_encode{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_encode{dims}_{suffix}")
     args = [_ptr(a) for a in arrs] + [_ptr(out), _sz(n)]
     fn(*args)
     return out
@@ -116,7 +117,7 @@ def decode(codes: np.ndarray, *, dims: int, bits: int) -> tuple:
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     n = codes.size
     outs = [np.empty(n, dtype=dtype) for _ in range(dims)]
-    fn = getattr(_lib, f"mortonarith_decode{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_decode{dims}_{suffix}")
     fn(_ptr(codes), *[_ptr(o) for o in outs], _sz(n))
     return tuple(outs)
 
@@ -129,7 +130,7 @@ def shift(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -> 
     _, suffix = _cfg(dims, bits)
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     out = np.empty_like(codes)
-    fn = getattr(_lib, f"mortonarith_add{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_add{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _sz(codes.size), ctypes.c_uint(axis), ctypes.c_int64(delta))
     return out
 
@@ -152,7 +153,7 @@ def add_sat(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -
     _, suffix = _cfg(dims, bits)
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     out = np.empty_like(codes)
-    fn = getattr(_lib, f"mortonarith_addsat{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_addsat{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _sz(codes.size), ctypes.c_uint(axis), ctypes.c_int64(delta))
     return out
 
@@ -172,7 +173,7 @@ def try_add(codes: np.ndarray, *, axis: int, delta: int, dims: int, bits: int) -
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     out = np.empty_like(codes)
     ok = np.empty(codes.size, dtype=np.uint8)
-    fn = getattr(_lib, f"mortonarith_tryadd{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_tryadd{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _ptr(ok), _sz(codes.size), ctypes.c_uint(axis),
        ctypes.c_int64(delta))
     return out, ok.astype(bool)
@@ -192,7 +193,7 @@ def face_neighbors(codes: np.ndarray, *, dims: int, bits: int) -> np.ndarray:
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     n = codes.size
     out = np.empty((n, 2 * dims), dtype=np.uint64)
-    fn = getattr(_lib, f"mortonarith_faceneighbors{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_faceneighbors{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _sz(n))
     return out
 
@@ -203,7 +204,7 @@ def all_neighbors(codes: np.ndarray, *, dims: int, bits: int) -> np.ndarray:
     codes = np.ascontiguousarray(codes, dtype=np.uint64)
     n = codes.size
     out = np.empty((n, 3 ** dims - 1), dtype=np.uint64)
-    fn = getattr(_lib, f"mortonarith_allneighbors{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_allneighbors{dims}_{suffix}")
     fn(_ptr(codes), _ptr(out), _sz(n))
     return out
 
@@ -214,7 +215,7 @@ def box_count(lo, hi, *, bits: int) -> int:
     dtype, suffix = _cfg(dims, bits)
     lo = np.ascontiguousarray(lo, dtype=dtype)
     hi = np.ascontiguousarray(hi, dtype=dtype)
-    fn = getattr(_lib, f"mortonarith_box_count{dims}_{suffix}")
+    fn = getattr(_lib, f"peclet_morton_box_count{dims}_{suffix}")
     fn.restype = _u64
     return int(fn(_ptr(lo), _ptr(hi)))
 
@@ -228,6 +229,6 @@ def box_zorder(lo, hi, *, bits: int) -> np.ndarray:
     n = box_count(lo, hi, bits=bits)
     out = np.empty(n, dtype=np.uint64)
     if n:
-        fn = getattr(_lib, f"mortonarith_box_zorder{dims}_{suffix}")
+        fn = getattr(_lib, f"peclet_morton_box_zorder{dims}_{suffix}")
         fn(_ptr(lo), _ptr(hi), _ptr(out))
     return out
