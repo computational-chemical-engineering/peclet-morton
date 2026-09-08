@@ -19,8 +19,25 @@
 
 #include "morton/hd.hpp"
 
+// MORTON_HAS_INT128: set when the compiler provides the `__int128` built-ins (GCC/Clang/nvcc).
+// Defined here rather than in morton.hpp because wide_uint.hpp is the lowest header that needs it.
+#if defined(__SIZEOF_INT128__)
+#define MORTON_HAS_INT128 1
+#endif
+
 namespace morton {
 namespace detail {
+
+#if defined(MORTON_HAS_INT128)
+/// The built-in 128-bit unsigned, used for 65..128-bit codes.
+///
+/// `__extension__` suppresses the "ISO C++ does not support '__int128'" diagnostic that GCC and
+/// Clang emit under `-Wpedantic`: `__int128` is a compiler extension, and this is the standard
+/// portable way to say "yes, deliberately" so that consumers compiling with `-Wpedantic` get a
+/// clean build. It changes nothing about the type or the generated code — spelling every other
+/// use of the built-in through this alias keeps the whole library quiet.
+__extension__ using uint128_t = unsigned __int128;
+#endif
 
 /// Fixed-width unsigned integer of @tparam W 64-bit words, little-endian (`w[0]` least
 /// significant). Selected automatically by `uint_for` when `Dim*Bits` exceeds the largest built-in
@@ -38,9 +55,9 @@ struct wide_uint {
     w[0] = std::uint64_t(static_cast<std::make_unsigned_t<T>>(v));
   }
 
-#if defined(__SIZEOF_INT128__)
+#if defined(MORTON_HAS_INT128)
   // From a 128-bit built-in (fills the low two words).
-  MORTON_HD constexpr wide_uint(unsigned __int128 v) : w{} {
+  MORTON_HD constexpr wide_uint(uint128_t v) : w{} {
     w[0] = std::uint64_t(v);
     if constexpr (W >= 2)
       w[1] = std::uint64_t(v >> 64);
@@ -55,11 +72,11 @@ struct wide_uint {
   }
 
   MORTON_HD explicit constexpr operator std::uint64_t() const { return w[0]; }
-#if defined(__SIZEOF_INT128__)
-  MORTON_HD explicit constexpr operator unsigned __int128() const {
-    unsigned __int128 r = w[0];
+#if defined(MORTON_HAS_INT128)
+  MORTON_HD explicit constexpr operator uint128_t() const {
+    uint128_t r = w[0];
     if constexpr (W >= 2)
-      r |= (unsigned __int128)(w[1]) << 64;
+      r |= uint128_t(w[1]) << 64;
     return r;
   }
 #endif

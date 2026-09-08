@@ -58,9 +58,9 @@
 #include <immintrin.h>
 #endif
 
-#if defined(__SIZEOF_INT128__)
-#define MORTON_HAS_INT128 1
-#endif
+// MORTON_HAS_INT128 and detail::uint128_t are defined by wide_uint.hpp (included above), which is
+// the lowest header that needs the built-in; the alias carries the `__extension__` marker that
+// keeps `-Wpedantic` consumers warning-free.
 
 // Maximum supported code width (Dim * Bits). Codes <= 64 use a built-in
 // integer, <= 128 use __uint128_t (where available), and wider codes use the
@@ -81,10 +81,6 @@
 namespace morton {
 
 namespace detail {
-
-#if defined(MORTON_HAS_INT128)
-using uint128_t = unsigned __int128;
-#endif
 
 // Smallest unsigned type that holds at least NBits bits: a built-in where one
 // exists, otherwise a wide_uint of the right number of 64-bit words.
