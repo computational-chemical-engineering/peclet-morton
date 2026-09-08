@@ -87,10 +87,6 @@ Convenience aliases: `Morton2D32`, `Morton2D16`, `Morton3D21`, `Morton3D16`,
 `Morton3D32`, `Morton2D64`. Codes wider than 128 bits (up to `MORTON_MAX_BITS`,
 default 256) work too, e.g. `Morton<3,64>` (192-bit), `Morton<2,128>` (256-bit).
 
-A linear **octree/quadtree** built on this library lives in the sibling
-[`octree/`](octree/) project (`morton_octree::Octree`) — it is being split into
-its own repository; see [octree/PLAN.md](octree/PLAN.md).
-
 ### GPU (Kokkos)
 
 A portable **Kokkos** backend lives in
@@ -186,7 +182,6 @@ conanfile.py         Conan recipe;  packaging/vcpkg/  vcpkg port
 cmake/               CMake package-config template (find_package(morton))
 .github/workflows/   ci.yml (build matrix) + release.yml (PyPI wheels on tag)
 docs/                EVALUATION.md, ROADMAP.md, HILBERT_GPU_NOTES.md, Doxyfile
-octree/              sibling project: linear octree on this library (being split out)
 third_party/         vendored doctest and libmorton (tests/benchmarks only)
 ```
 

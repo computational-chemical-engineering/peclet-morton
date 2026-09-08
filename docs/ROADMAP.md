@@ -11,9 +11,8 @@ runtime-dispatch paths; Doxygen). The current version is the `version` line of
 `pyproject.toml` (the single version source), the last release is the newest
 `v*` git tag, and the PyPI badge on the README shows what is published. The next
 release is the peclet family's clean-break 1.0.0 (see `../docs/QUALITY_PLAN.md`
-in the suite). The one part that is *not* finished is the `octree/` sibling
-scaffold (4 tests, no 2:1 balancing, no cross-level neighbours — see
-`../octree/PLAN.md`).
+in the suite). The `octree/` sibling scaffold was removed on 2026-09-08 (the
+suite's AMR lives in `core/`, see below); the library is complete without it.
 
 What is in:
 
@@ -42,9 +41,10 @@ What is in:
 - ✅ **(8) Neighbour-set + hierarchy helpers** — `face_neighbors()` (von
   Neumann), `all_neighbors()` (Moore, `3^Dim-1`), `ancestor`/`child`/
   `child_index`.
-- ✅ **(9) Octree on the new core** — `octree/include/morton_octree/octree.hpp` (split out into the
-  sibling `octree/` subproject): a linear octree/quadtree (`std::map` keyed by Morton origin) with point
-  location, face neighbours and refinement expressed via the core arithmetic.
+- ✅ **(9) Octree on the new core** — proven out as a `std::map` linear octree/quadtree with point
+  location, face neighbours and refinement expressed via the core arithmetic (the `octree/` scaffold,
+  removed 2026-09-08 — it survives only as `core/tests/oracle/morton_octree.hpp`). The production
+  octree is `core`'s `peclet::core::amr::BlockOctree`, built directly on `morton/morton.hpp`.
 - ✅ **(10) SIMD batch arithmetic** — `morton/batch.hpp` (`add`/`sub`/`step`/
   `encode2`/`encode3`) auto-vectorises (AVX2 `vpaddq`/`vpand`/`vpor`). Profiling
   (`benchmarks/bench_batch.cpp`) confirms ~1.7× over scalar when cache-resident
@@ -64,10 +64,9 @@ What is in:
   release.yml` (manylinux/musllinux/macOS/Windows, trusted publishing on tag).
   **Released wheels build the portable software path** (`MORTON_ENABLE_BMI2=OFF`)
   so they never SIGILL on a non-BMI2 CPU; source installs stay BMI2-fast.
-- ✅ **Octree split out** — moved to the sibling `octree/` project
-  (`morton_octree::Octree`), which depends on this library. 2:1 balancing,
-  cross-level neighbour queries and bulk construction are tracked in
-  [`../octree/PLAN.md`](../octree/PLAN.md), not here.
+- ✅ **Octree removed (2026-09-08)** — the `octree/` scaffold is gone; 2:1
+  balancing, cross-level neighbours and bulk construction are `core`'s
+  `BlockOctree` / `DistributedOctree` business, not this library's.
 - ✅ **Portable GPU backend (Kokkos)** — `include/morton/kokkos.hpp`
   (`morton::kokkos`). Runs on any Kokkos backend (CUDA / HIP / OpenMP / Serial).
   The core's `MORTON_HD` resolves to `KOKKOS_FUNCTION`, so kernels reuse the exact

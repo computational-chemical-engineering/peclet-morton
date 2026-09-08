@@ -55,8 +55,8 @@ A single doctest case can be run with `./build/tests/morton_tests --test-case="<
 
 ## Architecture (new core)
 
-Header dependency order: `morton.hpp` ← {`iterate.hpp`, `simd.hpp` ← `batch.hpp`}. (The octree was split
-out into the sibling `octree/` subproject — see below — and is no longer a core header.)
+Header dependency order: `morton.hpp` ← {`iterate.hpp`, `simd.hpp` ← `batch.hpp`}. (There is no octree
+header — see "Octree" below.)
 
 ### `morton/morton.hpp` — `Morton<unsigned Dim, unsigned Bits>`
 
@@ -96,9 +96,9 @@ The core's functions are prefixed with `MORTON_HD`. It now resolves to **`KOKKOS
 
 Build: opt-in with `-DMORTON_ENABLE_KOKKOS=ON` + `find_package(Kokkos CONFIG)` against the suite's bootstrapped prefix (`extern/install/<backend>` from `tools/bootstrap_deps.sh`) on `CMAKE_PREFIX_PATH`, exactly like `flow`/`dem`. Device sources stay plain `.cpp` — Kokkos 5.x routes them through the launch compiler (see `../cmake/SuiteKokkos.cmake`). The plain (non-Kokkos) build never touches Kokkos and is unchanged. **The raw-CUDA backend was retired** (was `cuda/`, `morton::cuda`); the last raw-CUDA tree is at the `pre-cuda-retirement` git tag.
 
-### Octree → sibling `octree/` project
+### Octree
 
-The octree is **no longer part of this library**. It moved to `octree/` (`morton_octree::Octree`, `octree/include/morton_octree/octree.hpp`), a separate project that depends on `morton::morton`. See `octree/PLAN.md`.
+The octree is **not part of this library**: `core/` has its own `peclet::core::amr::BlockOctree` built directly on `morton/morton.hpp`. The old `octree/` scaffold (`morton_octree::Octree`, a `std::map` linear octree) was removed on 2026-09-08 and lives on only as core's test oracle (`core/tests/oracle/morton_octree.hpp`); the last tree carrying it is commit `b502598`.
 
 ## Packaging / distribution
 
