@@ -4,7 +4,7 @@
 
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = "peclet-morton"
-PROJECT_NUMBER         = 0.2.1
+PROJECT_NUMBER         = 1.0.0
 PROJECT_BRIEF          = "Fast Morton (Z-order) codes with O(1) arithmetic"
 OUTPUT_DIRECTORY       = docs/doxygen
 CREATE_SUBDIRS         = NO
