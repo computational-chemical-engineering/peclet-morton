@@ -53,7 +53,10 @@ testpaths = ["bindings/python/tests"]
 # Source installs (`pip install .`) default to BMI2 ON and are fast directly.
 # ---------------------------------------------------------------------------
 [tool.cibuildwheel]
-build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+# cp314 verified green for all five packages on the 2026-09-13 wheel probe. Without it a user on a
+# current Python falls through to a source build on every platform, Linux included -- the same trap
+# a missing OS wheel is.
+build = "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = "*-musllinux_i686 *_i686 *-win32 pp*"
 build-frontend = "build"
 test-requires = ["pytest", "numpy"]
