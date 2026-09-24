@@ -49,7 +49,7 @@ Source = "https://github.com/computational-chemical-engineering/peclet-morton"
 Documentation = "https://computational-chemical-engineering.github.io/peclet/"
 "Examples gallery" = "https://computational-chemical-engineering.github.io/peclet-examples/"
 Issues = "https://github.com/computational-chemical-engineering/peclet-morton/issues"
-Changelog = "https://github.com/computational-chemical-engineering/peclet-morton/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/computational-chemical-engineering/peclet/blob/main/CHANGELOG.md"
 
 [tool.scikit-build]
 minimum-version = "0.8"
