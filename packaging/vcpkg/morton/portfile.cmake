@@ -7,8 +7,8 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO computational-chemical-engineering/peclet-morton
-    REF v0.2.1
-    SHA512 0
+    REF v1.0.2
+    SHA512 c2a67f09e88d56bec760653f33ea896988cce0be319e4c0dd0bf304ffc211d3ae1d07a9867aac8108d18d05855e68fe65c3f607a5361131e8329d916741cd839
     HEAD_REF main
 )
 
