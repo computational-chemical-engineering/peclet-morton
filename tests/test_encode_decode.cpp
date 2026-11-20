@@ -8,6 +8,25 @@
 
 using namespace morton;
 
+// libmorton's own stubs select its PDEP/PEXT code whenever the target has BMI2 or AVX2, so with
+// MORTON_ENABLE_BMI2=0 (whose test binary must contain no PDEP/PEXT) the agreement test calls the
+// portable sLUT encoders those stubs use otherwise.
+#if MORTON_ENABLE_BMI2
+inline std::uint64_t libmorton_encode2(std::uint32_t x, std::uint32_t y) {
+  return libmorton::morton2D_64_encode(x, y);
+}
+inline std::uint64_t libmorton_encode3(std::uint32_t x, std::uint32_t y, std::uint32_t z) {
+  return libmorton::morton3D_64_encode(x, y, z);
+}
+#else
+inline std::uint64_t libmorton_encode2(std::uint32_t x, std::uint32_t y) {
+  return libmorton::m2D_e_sLUT<std::uint_fast64_t, std::uint_fast32_t>(x, y);
+}
+inline std::uint64_t libmorton_encode3(std::uint32_t x, std::uint32_t y, std::uint32_t z) {
+  return libmorton::m3D_e_sLUT<std::uint_fast64_t, std::uint_fast32_t>(x, y, z);
+}
+#endif
+
 // Independent, obviously-correct reference encoder/decoder (bit by bit).
 template <unsigned Dim, unsigned Bits>
 static std::uint64_t ref_encode(const std::array<std::uint64_t, Dim>& c) {
@@ -63,7 +82,7 @@ TEST_CASE("agreement with libmorton (the de-facto reference library)") {
   SUBCASE("2D 32-bit") {
     for (int i = 0; i < 20000; ++i) {
       std::uint32_t x = std::uint32_t(rng()), y = std::uint32_t(rng());
-      CHECK(Morton<2, 32>::encode(x, y).code() == libmorton::morton2D_64_encode(x, y));
+      CHECK(Morton<2, 32>::encode(x, y).code() == libmorton_encode2(x, y));
     }
   }
   SUBCASE("3D 21-bit") {
@@ -72,7 +91,7 @@ TEST_CASE("agreement with libmorton (the de-facto reference library)") {
       std::uint32_t x = std::uint32_t(rng()) & mask;
       std::uint32_t y = std::uint32_t(rng()) & mask;
       std::uint32_t z = std::uint32_t(rng()) & mask;
-      CHECK(Morton<3, 21>::encode(x, y, z).code() == libmorton::morton3D_64_encode(x, y, z));
+      CHECK(Morton<3, 21>::encode(x, y, z).code() == libmorton_encode3(x, y, z));
     }
   }
 }
