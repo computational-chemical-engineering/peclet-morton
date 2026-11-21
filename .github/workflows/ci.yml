@@ -71,7 +71,8 @@ jobs:
   # no AVX-512 -> PDEP) and -skx (BMI2 + AVX-512).
   cpp-avx512-sde:
     name: ubuntu / gcc / AVX-512 + dispatch via Intel SDE
-    runs-on: ubuntu-latest
+    # Pinned: the ubuntu-26.04 loader requires x86-64-v3, so nothing starts under `sde64 -snb`.
+    runs-on: ubuntu-24.04
     # Intel rotates the SDE download URL/hash periodically; this validates the AVX-512 batch path
     # under emulation but must not gate the build when the external download moves. Update the url +
     # sha256 below when it 404s. (The scalar reference path is fully covered by the cpp jobs above.)
@@ -123,7 +124,9 @@ jobs:
   # ---- Python wheel build + tests across versions ---------------------------
   python:
     name: python ${{ matrix.python }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    # Python 3.9 (the floor in pyproject.toml) is not available on the ubuntu-26.04 image: that
+    # entry runs on ubuntu-24.04.
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' && matrix.python == '3.9') && 'ubuntu-24.04' || matrix.os }}
     strategy:
       fail-fast: false
       matrix:

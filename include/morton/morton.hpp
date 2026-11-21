@@ -7,8 +7,9 @@
 /// coordinates and re-encoding.
 ///
 /// Encoding/decoding uses the BMI2 PDEP/PEXT instructions when available (`-mbmi2`, codes up to 64
-/// bits) and a portable software implementation otherwise. The software path is `constexpr`, so
-/// encode/decode/arithmetic can run at compile time (e.g. to build lookup tables).
+/// bits) and `MORTON_ENABLE_BMI2` is not 0, and a portable software implementation otherwise. The
+/// software path is `constexpr`, so encode/decode/arithmetic can run at compile time (e.g. to build
+/// lookup tables).
 ///
 /// Codes up to 64 bits are stored in a built-in unsigned integer; codes from 65 to 128 bits use
 /// `__uint128_t` where the compiler provides it (GCC/Clang), so 3D 32-bit (96 bits) and 2D 64-bit
@@ -39,22 +40,39 @@
 #define MORTON_X86 0
 #endif
 
+// MORTON_ENABLE_BMI2 (default 1): 0 forbids the compile-time PDEP/PEXT intrinsics path even when
+// the compiler targets BMI2 (-mbmi2, -march=native, or a default target such as x86-64-v3), so
+// encode/decode use the software path. The CMake option MORTON_ENABLE_BMI2=OFF defines it to 0 on
+// the morton target; with 1 (or undefined) the intrinsics path is used whenever the compiler
+// provides BMI2, as before.
+#ifndef MORTON_ENABLE_BMI2
+#define MORTON_ENABLE_BMI2 1
+#endif
+// MORTON_BMI2_INTRINSICS (internal): compile the PDEP/PEXT intrinsics path. The single
+// selection condition for it; nothing else in morton decides on __BMI2__.
+#if defined(__BMI2__) && MORTON_ENABLE_BMI2
+#define MORTON_BMI2_INTRINSICS 1
+#else
+#define MORTON_BMI2_INTRINSICS 0
+#endif
+
 // MORTON_ENABLE_RUNTIME_DISPATCH (opt-in, default 0): build a single binary
 // *without* -mbmi2 that still uses PDEP/PEXT when the running CPU has BMI2 and
 // the software fallback otherwise -- removing the build-time portability/speed
 // trade-off (e.g. for distributable wheels). Left off by default so the plain
 // non-BMI2 build stays strictly software (and pdep/pext-free). It self-disables
-// when -mbmi2 is already on (the compile-time intrinsic path is used instead).
+// when the compile-time intrinsic path is selected (MORTON_BMI2_INTRINSICS), so
+// with MORTON_ENABLE_BMI2=0 it also works on a compiler whose target has BMI2.
 #ifndef MORTON_ENABLE_RUNTIME_DISPATCH
 #define MORTON_ENABLE_RUNTIME_DISPATCH 0
 #endif
-#if MORTON_X86 && MORTON_ENABLE_RUNTIME_DISPATCH && !defined(__BMI2__)
+#if MORTON_X86 && MORTON_ENABLE_RUNTIME_DISPATCH && !MORTON_BMI2_INTRINSICS
 #define MORTON_X86_RUNTIME_DISPATCH 1
 #else
 #define MORTON_X86_RUNTIME_DISPATCH 0
 #endif
 
-#if MORTON_X86 || defined(__BMI2__)
+#if MORTON_X86 || MORTON_BMI2_INTRINSICS
 #include <immintrin.h>
 #endif
 
@@ -472,7 +490,7 @@ class Morton {
     if constexpr (code_bits <= 64) {
       // PDEP is a host x86 instruction; never emit it in CUDA device code
       // (where __CUDA_ARCH__ is defined), even if the host was -mbmi2.
-#if defined(__BMI2__) && !defined(__CUDA_ARCH__)
+#if MORTON_BMI2_INTRINSICS && !defined(__CUDA_ARCH__)
       if (!detail::is_consteval())
         return code_type(_pdep_u64(std::uint64_t(x), std::uint64_t(axis_mask(d))));
 #elif MORTON_X86_RUNTIME_DISPATCH
@@ -486,7 +504,7 @@ class Morton {
 
   MORTON_HD static constexpr coord_type extract(code_type c, unsigned d) {
     if constexpr (code_bits <= 64) {
-#if defined(__BMI2__) && !defined(__CUDA_ARCH__)
+#if MORTON_BMI2_INTRINSICS && !defined(__CUDA_ARCH__)
       if (!detail::is_consteval())
         return coord_type(_pext_u64(std::uint64_t(c), std::uint64_t(axis_mask(d))));
 #elif MORTON_X86_RUNTIME_DISPATCH

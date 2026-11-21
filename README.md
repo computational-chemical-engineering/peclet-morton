@@ -66,8 +66,9 @@ operations, which libmorton and similar libraries do not provide.
   is stored in the smallest unsigned integer that fits. `Dim * Bits ≤ 64` uses a
   built-in integer; **65–128 bits use `__uint128_t`** where available, so 3D
   32-bit (`Morton3D32`, 96-bit) and 2D 64-bit (`Morton2D64`, 128-bit) work too.
-- Encode/decode use **BMI2 `PDEP`/`PEXT`** when compiled with `-mbmi2`, with a
-  portable software fallback otherwise. Both paths are tested for agreement.
+- Encode/decode use **BMI2 `PDEP`/`PEXT`** when compiled with `-mbmi2` (unless
+  `MORTON_ENABLE_BMI2` is 0, which the CMake option OFF sets), with a portable
+  software fallback otherwise. Both paths are tested for agreement.
 - **`constexpr`**: the software path runs at compile time (selected via
   `__builtin_is_constant_evaluated()`), so you can build lookup tables in
   `constexpr`.

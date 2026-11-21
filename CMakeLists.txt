@@ -24,7 +24,8 @@ target_include_directories(morton INTERFACE
     $<INSTALL_INTERFACE:include>)
 target_compile_features(morton INTERFACE cxx_std_17)
 
-option(MORTON_ENABLE_BMI2 "Use BMI2 PDEP/PEXT for encode/decode" ON)
+option(MORTON_ENABLE_BMI2
+    "Use BMI2 PDEP/PEXT for encode/decode (OFF: software path, no PDEP/PEXT whatever the compiler target)" ON)
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-mbmi2" MORTON_HAS_MBMI2)
 if(MORTON_ENABLE_BMI2 AND MORTON_HAS_MBMI2)
@@ -32,6 +33,11 @@ if(MORTON_ENABLE_BMI2 AND MORTON_HAS_MBMI2)
     # to consumers of the installed package (MSVC/other compilers ignore it).
     target_compile_options(morton INTERFACE
         $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-mbmi2>)
+endif()
+if(NOT MORTON_ENABLE_BMI2)
+    # The header selects PDEP/PEXT on __BMI2__ AND the macro MORTON_ENABLE_BMI2, so OFF holds even on
+    # a compiler whose default target has BMI2 (e.g. x86-64-v3), without -mno-bmi2 in consumer TUs.
+    target_compile_definitions(morton INTERFACE MORTON_ENABLE_BMI2=0)
 endif()
 
 # Single-binary runtime ISA dispatch (x86-64 GCC/Clang). Builds *without*

@@ -30,7 +30,8 @@ ctest --test-dir build --output-on-failure        # or ./build/tests/morton_test
 cmake --build build --target docs                  # Doxygen -> docs/doxygen/html
 ```
 
-Useful options: `-DMORTON_ENABLE_BMI2=OFF` (force the portable software path),
+Useful options: `-DMORTON_ENABLE_BMI2=OFF` (force the portable software path, also on a
+compiler whose default target has BMI2: it defines `MORTON_ENABLE_BMI2=0` on the target),
 `-DMORTON_BUILD_BENCHMARKS=OFF`, `-DMORTON_BUILD_BINDINGS=OFF`. A non-BMI2 build
 must also pass — it exercises the software fallback:
 
