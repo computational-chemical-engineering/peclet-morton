@@ -58,6 +58,10 @@ class MortonConan(ConanFile):
         self.cpp_info.libdirs = []
         if self.options.with_bmi2 and self.settings.compiler in ("gcc", "clang", "apple-clang"):
             self.cpp_info.cxxflags = ["-mbmi2"]
+        if not self.options.with_bmi2:
+            # Same as the CMake option MORTON_ENABLE_BMI2=OFF: forbid the PDEP/PEXT path even on a
+            # compiler whose default target has BMI2.
+            self.cpp_info.defines = ["MORTON_ENABLE_BMI2=0"]
 
     def package_id(self):
         # Header-only package: independent of settings.
